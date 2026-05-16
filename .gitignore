@@ -1,3 +1,11 @@
+# Reverse-engineering workspace (decompiler + copyrighted APKs — keep out of git)
+tools/
+*.apk
+*.xapk
+*.dex
+decompiled/
+ble_log_*.txt
+
 # Miscellaneous
 *.class
 *.log
