@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小莫划船机 App · 原型 (小米 17 Pro)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  :root{
+    --accent:#2F6BFF; --accent-soft:#EAF1FF;
+    --bg:#F4F6FA; --card:#FFFFFF;
+    --ink:#13223F; --ink-2:#6B7689; --ink-3:#9AA4B6;
+    --line:#ECEFF4;
+    --cyan:#06B6D4; --amber:#F59E0B; --orange:#F97316;
+    --green:#22C55E; --red:#EF4444; --rose:#F43F5E;
+    --ok:#16A34A; --shadow:0 6px 22px rgba(20,32,64,.07);
+  }
+  html,body{ height:100%; }
+  body{
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",
+      "Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:#DCE2EA; color:var(--ink);
+    display:flex; align-items:stretch; justify-content:center;
+    height:100vh; overflow:hidden; padding:0;
+  }
+  .stage{ position:relative; width:min(412px,100vw); height:100vh; }
+
+  /* ---------- 左侧屏幕导航(评审用,非 App 一部分) ---------- */
+  .nav-pane{ width:228px; flex:0 0 228px; position:sticky; top:34px; }
+  .nav-pane h1{ font-size:16px; margin-bottom:4px; }
+  .nav-pane .sub{ font-size:12px; color:var(--ink-2); margin-bottom:16px; line-height:1.5; }
+  .nav-pane .grp{ font-size:11px; color:var(--ink-3); letter-spacing:.08em;
+    margin:16px 0 7px; text-transform:uppercase; }
+  .nav-pane button{
+    display:block; width:100%; text-align:left; border:0; cursor:pointer;
+    background:#fff; color:var(--ink); font-size:13px; padding:9px 12px;
+    border-radius:11px; margin-bottom:6px; box-shadow:var(--shadow);
+    transition:.15s; font-family:inherit;
+  }
+  .nav-pane button:hover{ transform:translateX(2px); }
+  .nav-pane button.on{ background:var(--accent); color:#fff; }
+  .nav-pane .spec{ margin-top:18px; font-size:11px; color:var(--ink-3);
+    line-height:1.7; border-top:1px solid #cdd5e1; padding-top:12px; }
+
+  /* ---------- 手机外框:小米 17 Pro  1220x2656 物理 → 412x897 CSS ---------- */
+  .phone{
+    width:100%; height:100%; position:relative;
+    background:var(--bg); overflow:hidden;
+  }
+  .screen-host{
+    position:absolute; inset:0; overflow:hidden;
+    background:var(--bg);
+  }
+  .punch{ display:none; }
+
+  .screen{ position:absolute; inset:0; display:none; flex-direction:column;
+    background:var(--bg); }
+  .screen.active{ display:flex; }
+
+  /* 系统状态栏 */
+  .sysbar{ height:38px; flex:0 0 38px; display:flex; align-items:flex-end;
+    justify-content:space-between; padding:0 26px 5px; font-size:13px;
+    font-weight:600; color:var(--ink); }
+  .sysbar.dark{ color:#fff; }
+  .sysbar .r{ display:flex; gap:6px; align-items:center; }
+  .sysbar svg{ display:block; }
+  .sysbar .r .sig{ height:11px; width:auto; fill:currentColor; }
+  .sysbar .r .bat{ height:13px; width:auto; }
+  .sysbar .r .bat .lvl{ fill:currentColor; }
+  .sysbar .r .bat .shell{ fill:none; stroke:currentColor;
+    stroke-width:1.3; opacity:.55; }
+  .sysbar .r .net{ font-size:12px; font-weight:700; letter-spacing:.02em; }
+
+  /* 顶部应用条 */
+  .appbar{ height:50px; flex:0 0 50px; display:flex; align-items:center;
+    padding:0 16px; gap:10px; font-size:18px; font-weight:700; }
+  .appbar .back{ width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    background:#fff; box-shadow:var(--shadow); flex:0 0 34px; }
+  .appbar .title{ flex:1; }
+  .appbar .act{ width:34px; height:34px; border-radius:50%; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    background:#fff; box-shadow:var(--shadow); color:var(--ink-2); }
+
+  .body{ flex:1; overflow-y:auto; padding:4px 16px 80px; }
+  .body::-webkit-scrollbar{ width:0; }
+
+  /* 底部 Tab 栏 */
+  .tabbar{ position:absolute; left:0; right:0; bottom:0; z-index:60;
+    height:64px; display:flex;
+    background:#fff; border-top:1px solid var(--line);
+    padding-bottom:6px; }
+  .tabbar.hidden{ display:none; }
+  .tabbar .tab{ flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:3px; cursor:pointer;
+    color:var(--ink-3); font-size:11px; font-weight:600; }
+  .tabbar .tab.on{ color:var(--accent); }
+  .tabbar .tab svg{ width:23px; height:23px; }
+
+  /* 通用卡片 / 元素 */
+  .card{ background:var(--card); border-radius:18px; box-shadow:var(--shadow);
+    padding:16px; margin-bottom:13px; }
+  .btn{ display:flex; align-items:center; justify-content:center; gap:8px;
+    background:var(--accent); color:#fff; border:0; cursor:pointer;
+    font-family:inherit; font-size:16px; font-weight:700;
+    padding:15px; border-radius:15px; width:100%;
+    box-shadow:0 8px 18px rgba(47,107,255,.28); }
+  .btn.ghost{ background:#fff; color:var(--accent);
+    box-shadow:var(--shadow); }
+  .btn.danger{ background:#fff; color:var(--red); box-shadow:var(--shadow); }
+  .link{ text-align:center; color:var(--accent); font-size:13px;
+    font-weight:600; cursor:pointer; padding:14px; }
+  .muted{ color:var(--ink-2); font-size:13px; }
+  .pill{ display:inline-flex; align-items:center; gap:6px; font-size:12px;
+    font-weight:600; padding:5px 11px; border-radius:999px; }
+
+  /* ---------- 连接界面 ---------- */
+  .connect-wrap{ flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; padding:0 28px; gap:6px; }
+  .rower-badge{ width:118px; height:118px; border-radius:34px;
+    background:linear-gradient(150deg,#3D7BFF,#2F6BFF);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 16px 30px rgba(47,107,255,.34); margin-bottom:22px; }
+  .rower-badge svg{ width:62px; height:62px; }
+  .dev-name{ font-size:27px; font-weight:800; }
+  .dev-sub{ color:var(--ink-2); font-size:14px; margin-top:5px; }
+  .rssi-chip{ margin-top:14px; background:#EAFBF1; color:var(--ok);
+    font-size:12px; font-weight:700; padding:6px 13px; border-radius:999px; }
+  .find-hint{ color:var(--ink-3); font-size:12.5px; text-align:center;
+    line-height:1.7; margin-top:6px; }
+
+  /* 全部设备列表 */
+  .dev-row{ display:flex; align-items:center; gap:13px; padding:13px 4px;
+    border-bottom:1px solid var(--line); cursor:pointer; }
+  .dev-row .av{ width:40px; height:40px; border-radius:13px; flex:0 0 40px;
+    background:var(--accent-soft); color:var(--accent);
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:800; }
+  .dev-row .nm{ flex:1; min-width:0; }
+  .dev-row .nm b{ font-size:15px; }
+  .dev-row .nm small{ display:block; color:var(--ink-3); font-size:11px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* ---------- 仪表盘 ---------- */
+  .statusstrip{ display:flex; align-items:center; gap:8px;
+    background:#E9F8EF; color:var(--ok); font-size:12.5px; font-weight:700;
+    padding:9px 16px; }
+  .statusstrip.bad{ background:#FDEBEC; color:var(--red); }
+  .statusstrip .rec{ margin-left:auto; color:var(--ink-3); font-weight:600;
+    font-size:11px; }
+  .hero{ background:linear-gradient(150deg,#2F6BFF,#5B8CFF); color:#fff;
+    border-radius:20px; padding:18px 20px; margin-bottom:13px;
+    box-shadow:0 12px 26px rgba(47,107,255,.30); }
+  .hero .lab{ font-size:13px; opacity:.86; font-weight:600; }
+  .hero .val{ font-size:54px; font-weight:800; line-height:1.05;
+    letter-spacing:-1px; margin-top:2px; }
+  .hero .val small{ font-size:18px; font-weight:700; opacity:.85; }
+  .hero .row{ display:flex; justify-content:space-between; margin-top:12px;
+    font-size:12.5px; opacity:.9; }
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+  .tile{ background:#fff; border-radius:16px; padding:14px 15px;
+    box-shadow:var(--shadow); }
+  .tile .v{ font-size:30px; font-weight:800; line-height:1; }
+  .tile .v small{ font-size:14px; font-weight:700; }
+  .tile .l{ color:var(--ink-2); font-size:12.5px; margin-top:6px;
+    font-weight:600; }
+  .hr-band{ display:flex; align-items:center; gap:14px;
+    background:#FFF1F2; border-radius:16px; padding:14px 16px;
+    margin-bottom:13px; }
+  .hr-band .ic{ width:42px; height:42px; border-radius:13px; flex:0 0 42px;
+    background:#FFE0E3; color:var(--red); display:flex;
+    align-items:center; justify-content:center; }
+  .hr-band .v{ font-size:28px; font-weight:800; color:var(--red); }
+  .hr-band .v small{ font-size:13px; }
+  .hr-band .meta{ margin-left:auto; text-align:right; color:var(--ink-2);
+    font-size:11.5px; line-height:1.6; }
+  .bottom-note{ text-align:center; color:var(--ink-3); font-size:12px;
+    margin:6px 0 12px; }
+
+  /* ---------- 记录列表 ---------- */
+  .week-sum{ display:flex; background:#fff; border-radius:18px;
+    box-shadow:var(--shadow); padding:16px 0; margin-bottom:15px; }
+  .week-sum div{ flex:1; text-align:center;
+    border-right:1px solid var(--line); }
+  .week-sum div:last-child{ border-right:0; }
+  .week-sum b{ font-size:22px; font-weight:800; }
+  .week-sum span{ display:block; color:var(--ink-2); font-size:11.5px;
+    margin-top:4px; }
+  .day-label{ font-size:12px; color:var(--ink-3); font-weight:700;
+    margin:6px 4px 9px; }
+  .rec-card{ display:flex; align-items:center; gap:14px; cursor:pointer; }
+  .rec-card .ds{ flex:0 0 56px; text-align:center; }
+  .rec-card .ds b{ font-size:22px; font-weight:800; display:block;
+    color:var(--accent); }
+  .rec-card .ds span{ font-size:11px; color:var(--ink-3); }
+  .rec-card .mid{ flex:1; }
+  .rec-card .mid .big{ font-size:19px; font-weight:800; }
+  .rec-card .mid .meta{ color:var(--ink-2); font-size:12px; margin-top:3px;
+    display:flex; gap:12px; flex-wrap:wrap; }
+  .spark{ flex:0 0 64px; }
+
+  /* ---------- 记录详情 ---------- */
+  .detail-hero{ text-align:center; padding:8px 0 18px; }
+  .detail-hero .d{ color:var(--ink-2); font-size:13px; }
+  .detail-hero .dist{ font-size:46px; font-weight:800; letter-spacing:-1px;
+    margin:4px 0 2px; }
+  .detail-hero .dur{ color:var(--ink-2); font-size:15px; font-weight:600; }
+  .stat-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:1px;
+    background:var(--line); border-radius:16px; overflow:hidden;
+    margin-bottom:14px; }
+  .stat-grid div{ background:#fff; padding:15px 8px; text-align:center; }
+  .stat-grid b{ font-size:19px; font-weight:800; display:block; }
+  .stat-grid span{ font-size:11px; color:var(--ink-2); margin-top:4px;
+    display:block; }
+  .chart-title{ font-size:14px; font-weight:700; margin:2px 0 12px;
+    display:flex; align-items:center; gap:8px; }
+  .chart-title i{ width:10px; height:10px; border-radius:3px;
+    display:inline-block; }
+
+  /* ---------- 我的 ---------- */
+  .me-head{ display:flex; align-items:center; gap:15px; padding:6px 2px 20px; }
+  .me-head .avatar{ width:62px; height:62px; border-radius:50%;
+    background:linear-gradient(150deg,#3D7BFF,#2F6BFF); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:25px; font-weight:800; flex:0 0 62px; }
+  .me-head .nm b{ font-size:21px; font-weight:800; }
+  .me-head .nm span{ display:block; color:var(--ink-2); font-size:13px;
+    margin-top:3px; }
+  .me-head .switch{ margin-left:auto; color:var(--accent); font-size:13px;
+    font-weight:700; cursor:pointer; }
+  .me-stats{ display:flex; background:#fff; border-radius:18px;
+    box-shadow:var(--shadow); padding:18px 0; margin-bottom:16px; }
+  .me-stats div{ flex:1; text-align:center; border-right:1px solid var(--line); }
+  .me-stats div:last-child{ border-right:0; }
+  .me-stats b{ font-size:20px; font-weight:800; }
+  .me-stats span{ display:block; color:var(--ink-2); font-size:11.5px;
+    margin-top:4px; }
+  .list{ background:#fff; border-radius:18px; box-shadow:var(--shadow);
+    overflow:hidden; }
+  .list .item{ display:flex; align-items:center; gap:14px;
+    padding:15px 16px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .list .item:last-child{ border-bottom:0; }
+  .list .item .ic{ width:34px; height:34px; border-radius:10px; flex:0 0 34px;
+    background:var(--accent-soft); color:var(--accent);
+    display:flex; align-items:center; justify-content:center; }
+  .list .item .tx{ flex:1; }
+  .list .item .tx b{ font-size:15px; font-weight:600; }
+  .list .item .tx span{ display:block; color:var(--ink-3); font-size:12px;
+    margin-top:2px; }
+  .list .item .rt{ color:var(--ink-3); font-size:13px; }
+
+  /* 用户切换 */
+  .user-row{ display:flex; align-items:center; gap:14px; padding:15px 16px;
+    border-bottom:1px solid var(--line); cursor:pointer; }
+  .user-row .av{ width:46px; height:46px; border-radius:50%; flex:0 0 46px;
+    display:flex; align-items:center; justify-content:center; color:#fff;
+    font-weight:800; font-size:18px; }
+  .user-row .info{ flex:1; }
+  .user-row .info b{ font-size:16px; }
+  .user-row .info span{ display:block; color:var(--ink-2); font-size:12px;
+    margin-top:2px; }
+  .user-row .chk{ color:var(--accent); }
+
+  /* 设置 / 标定 */
+  .set-block{ margin-bottom:13px; }
+  .set-block .sl-lab{ display:flex; justify-content:space-between;
+    font-size:14px; font-weight:600; margin-bottom:10px; }
+  .set-block .sl-lab b{ color:var(--accent); }
+  .track{ height:6px; border-radius:3px; background:var(--line);
+    position:relative; }
+  .track .fill{ position:absolute; left:0; top:0; bottom:0;
+    background:var(--accent); border-radius:3px; }
+  .track .knob{ position:absolute; top:50%; width:20px; height:20px;
+    border-radius:50%; background:#fff; transform:translate(-50%,-50%);
+    box-shadow:0 2px 8px rgba(0,0,0,.2); border:2px solid var(--accent); }
+  .set-note{ color:var(--ink-3); font-size:11.5px; line-height:1.6;
+    margin-top:9px; }
+
+  /* 原始调试 */
+  .raw-log{ font-family:"SF Mono",Consolas,monospace; font-size:10.5px;
+    background:#0E1726; color:#7CF3C0; border-radius:14px; padding:14px;
+    line-height:1.7; overflow-x:auto; }
+  .raw-log .t{ color:#5FB8FF; }
+  .raw-log .p{ color:#FFCB6B; }
+
+  /* 分段表 / 分段控件 */
+  .seg{ display:flex; background:#E7EBF2; border-radius:13px; padding:4px;
+    margin-bottom:14px; }
+  .seg div{ flex:1; text-align:center; font-size:13px; font-weight:700;
+    padding:9px; border-radius:10px; color:var(--ink-2); cursor:pointer; }
+  .seg div.on{ background:#fff; color:var(--accent); box-shadow:var(--shadow); }
+  .splits{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .splits th{ color:var(--ink-3); font-weight:700; font-size:11px;
+    text-align:right; padding:7px 5px 9px; border-bottom:1px solid var(--line); }
+  .splits th:first-child{ text-align:left; }
+  .splits td{ text-align:right; padding:10px 5px; font-weight:700;
+    border-bottom:1px solid var(--line); }
+  .splits td:first-child{ text-align:left; color:var(--ink-2);
+    font-weight:600; }
+  .splits tr:last-child td{ border-bottom:0; }
+  .splits tr.cur td{ color:var(--accent); }
+  .splits tr.best td{ color:var(--ok); }
+
+  /* 训练目标设置 */
+  .mode{ display:flex; align-items:center; gap:13px; padding:15px 16px;
+    border-bottom:1px solid var(--line); cursor:pointer; }
+  .mode:last-child{ border-bottom:0; }
+  .mode .ic{ width:38px; height:38px; border-radius:11px; flex:0 0 38px;
+    background:var(--accent-soft); color:var(--accent); display:flex;
+    align-items:center; justify-content:center; }
+  .mode .tx{ flex:1; }
+  .mode .tx b{ font-size:15px; }
+  .mode .tx span{ display:block; color:var(--ink-3); font-size:12px;
+    margin-top:2px; }
+  .mode .radio{ width:21px; height:21px; border-radius:50%; flex:0 0 21px;
+    border:2px solid #CBD3E0; }
+  .mode.sel{ background:var(--accent-soft); }
+  .mode.sel .radio{ border-color:var(--accent);
+    background:radial-gradient(circle,var(--accent) 0 5px,#fff 6px); }
+  .param{ background:#F0F3F9; border-radius:15px; padding:14px;
+    margin-bottom:13px; }
+  .param .pl{ font-size:12px; color:var(--ink-2); font-weight:700;
+    margin:0 2px 11px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:9px; }
+  .chips .c{ padding:10px 16px; border-radius:12px; background:#fff;
+    box-shadow:var(--shadow); font-size:13px; font-weight:700; cursor:pointer; }
+  .chips .c.on{ background:var(--accent); color:#fff;
+    box-shadow:0 6px 14px rgba(47,107,255,.3); }
+
+  /* 趋势柱状 / 连续打卡 */
+  .bars{ display:flex; align-items:flex-end; gap:8px; height:124px;
+    padding:4px 2px 22px; }
+  .bars .b{ flex:1; background:linear-gradient(180deg,#6E97FF,#2F6BFF);
+    border-radius:6px 6px 0 0; position:relative; min-height:6px; }
+  .bars .b.peak{ background:linear-gradient(180deg,#34D17E,#16A34A); }
+  .bars .b span{ position:absolute; bottom:-20px; left:-2px; right:-2px;
+    text-align:center; font-size:10px; color:var(--ink-3); }
+  .streak{ display:inline-flex; align-items:center; gap:7px;
+    background:#FFF3E6; color:#C2630A; font-size:12.5px; font-weight:700;
+    padding:9px 15px; border-radius:999px; margin-bottom:15px; }
+
+  /* 启动 / 自动连接 / 倒计时 */
+  .btn.lg{ padding:19px; font-size:18px; border-radius:18px; }
+  .conn-wrap{ flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; padding:0 34px;
+    text-align:center; }
+  .pulse{ width:170px; height:170px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    position:relative; margin-bottom:34px; }
+  .pulse b{ position:absolute; inset:0; border-radius:50%;
+    background:rgba(47,107,255,.16); animation:pl 2.1s ease-out infinite; }
+  .pulse b:nth-child(2){ animation-delay:1.05s; }
+  @keyframes pl{ 0%{ transform:scale(.55); opacity:.85; }
+    100%{ transform:scale(1.5); opacity:0; } }
+  .pulse .core{ width:104px; height:104px; border-radius:50%;
+    background:linear-gradient(150deg,#3D7BFF,#2F6BFF); z-index:2;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 14px 28px rgba(47,107,255,.42); }
+  .conn-wrap h2{ font-size:21px; font-weight:800; }
+  .conn-msg{ color:var(--ink-2); font-size:14px; margin-top:10px;
+    min-height:21px; }
+  .conn-tip{ background:#FFF3E6; color:#C2630A; font-size:12.5px;
+    font-weight:600; padding:12px 16px; border-radius:14px;
+    margin-top:26px; line-height:1.7; }
+  .countdown{ font-size:128px; font-weight:800; color:var(--accent);
+    line-height:1; letter-spacing:-4px; margin-top:6px; }
+  .ok-badge{ width:76px; height:76px; border-radius:50%;
+    background:#E9F8EF; color:var(--ok); display:flex;
+    align-items:center; justify-content:center; margin-bottom:18px; }
+
+  .banner{ display:flex; align-items:center; gap:8px; background:#FDECC8;
+    color:#9A6700; font-size:12.5px; font-weight:700; padding:10px 16px; }
+  .btn.disabled{ background:#C7D0DE; box-shadow:none; color:#fff;
+    pointer-events:none; }
+  .empty{ flex:1; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; text-align:center; padding:0 44px; gap:7px; }
+  .empty .ill{ width:96px; height:96px; border-radius:50%;
+    background:var(--accent-soft); color:var(--accent); display:flex;
+    align-items:center; justify-content:center; margin-bottom:16px; }
+  .empty h3{ font-size:18px; font-weight:800; }
+  .empty p{ color:var(--ink-2); font-size:13px; line-height:1.7; }
+  .btn{ transition:transform .08s ease, filter .08s ease; }
+  .btn:active{ transform:translateY(1px); filter:brightness(.96); }
+  .mode:active,.chips .c:active,.list .item:active,.rec-card:active,
+  .dev-row:active,.seg div:active,.appbar .back:active,
+  .appbar .act:active,.link:active{ background:#EBF0F8; }
+  .tabbar .tab:active{ opacity:.55; }
+  @keyframes scrIn{ from{ opacity:0; } to{ opacity:1; } }
+  .screen.active{ animation:scrIn .2s ease; }
+
+  /* 手机按视口等比缩放,见底部 fitPhone() —— 浏览器自身缩放,
+     渲染与点击坐标一致,不会出现"看到的和点到的错位" */
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+<div class="phone" id="phone">
+  <div class="screen-host">
+    <div class="punch"></div>
+
+    <!-- ① 连接划船机 -->
+    <section class="screen active" data-screen="connect">
+      <div class="sysbar"><span>21:36</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar"><div class="title">小莫划船机</div>
+        <div class="act" data-jump="profile">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+        </div>
+      </div>
+      <div class="connect-wrap">
+        <div class="rower-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M5 6h5l4 6 4-3"/><path d="M9 12l3 6"/></svg>
+        </div>
+        <div class="dev-name">小莫划船机</div>
+        <div class="dev-sub">AT-R79517 · 已记住</div>
+        <div class="find-hint" style="margin-top:14px">开机后自动连接,中途无需任何操作<br>点「开始划船」,拉一下手柄唤醒即可</div>
+        <div style="height:30px"></div>
+        <button class="btn lg" data-go="connecting" style="max-width:264px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          开始划船
+        </button>
+        <button class="btn ghost" data-jump="goalsetup" style="max-width:264px;margin-top:11px;font-size:14px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4M6 4h11l-2.5 4L17 12H6"/></svg>
+          选择训练目标(定距 / 间歇…)
+        </button>
+        <div class="link" data-jump="alldevices" style="margin-top:auto;padding-bottom:22px">连不上?手动选择蓝牙设备</div>
+      </div>
+    </section>
+
+    <!-- ①b 自动连接中(无需点击,自动流转) -->
+    <section class="screen" data-screen="connecting">
+      <div class="sysbar"><span>21:41</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar"><div class="title"></div></div>
+      <div class="conn-wrap">
+        <div class="pulse"><b></b><b></b>
+          <div class="core">
+            <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M5 6h5l4 6 4-3"/><path d="M9 12l3 6"/></svg>
+          </div>
+        </div>
+        <h2>正在连接划船机</h2>
+        <div class="conn-msg" id="connMsg">正在扫描划船机…</div>
+        <div class="conn-tip">🤚 拉一下划船机手柄唤醒它<br>开机后自动连接,中途无需任何点击</div>
+        <div class="link" data-jump="connect" style="margin-top:30px">取消</div>
+      </div>
+    </section>
+
+    <!-- ①c 连接成功 · 从 0 开始计时 -->
+    <section class="screen" data-screen="ready">
+      <div class="sysbar"><span>21:41</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar"><div class="title"></div></div>
+      <div class="conn-wrap">
+        <div class="ok-badge">
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12l4 4L19 7"/></svg>
+        </div>
+        <h2>已连接 AT-R79517</h2>
+        <div class="conn-msg">从 0 开始计时计数,准备好就划!</div>
+        <div class="countdown" id="cdNum">3</div>
+        <div class="link" data-go="dashboard" style="margin-top:18px">跳过</div>
+      </div>
+    </section>
+
+    <!-- ② 全部蓝牙设备 -->
+    <section class="screen" data-screen="alldevices">
+      <div class="sysbar"><span>21:36</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar">
+        <div class="back" data-jump="connect">‹</div>
+        <div class="title">全部蓝牙设备</div>
+        <div class="muted" style="font-size:12px">扫描中 · 5</div>
+      </div>
+      <div class="body">
+        <div class="card" style="padding:6px 16px">
+          <div class="dev-row" data-go="goalsetup">
+            <div class="av">−52</div>
+            <div class="nm"><b>AT-R79517</b><small>30:AE:7B:11:09:5C · 0xFFE0 划船机数据</small></div>
+            <div style="color:var(--ink-3)">›</div>
+          </div>
+          <div class="dev-row">
+            <div class="av">−71</div>
+            <div class="nm"><b>Xiaomi Watch S4 Sport</b><small>心率广播 · 0x180D Heart Rate</small></div>
+            <div style="color:var(--ink-3)">›</div>
+          </div>
+          <div class="dev-row">
+            <div class="av">−83</div>
+            <div class="nm"><b>(无名设备)</b><small>4F:22:90:AC:1E:07</small></div>
+            <div style="color:var(--ink-3)">›</div>
+          </div>
+          <div class="dev-row">
+            <div class="av">−88</div>
+            <div class="nm"><b>Mi Smart Band 8</b><small>6C:1A:8B:D0:34:9F</small></div>
+            <div style="color:var(--ink-3)">›</div>
+          </div>
+          <div class="dev-row" style="border-bottom:0">
+            <div class="av">−91</div>
+            <div class="nm"><b>(无名设备)</b><small>11:55:CE:7A:00:42</small></div>
+            <div style="color:var(--ink-3)">›</div>
+          </div>
+        </div>
+        <div class="link" data-jump="connect">‹ 返回只看划船机</div>
+      </div>
+    </section>
+
+    <!-- ③ 训练目标设置 -->
+    <section class="screen" data-screen="goalsetup">
+      <div class="sysbar"><span>21:42</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar">
+        <div class="back" data-jump="connect">‹</div>
+        <div class="title">选择训练</div>
+      </div>
+      <div class="body">
+        <div class="statusstrip" style="border-radius:13px;margin-bottom:14px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
+          已连接 AT-R79517 · 选个目标开始,也可直接自由划
+        </div>
+        <div class="card" style="padding:0;margin-bottom:13px">
+          <div class="list" style="box-shadow:none">
+            <div class="mode">
+              <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M5 6h5l4 6 4-3"/></svg></div>
+              <div class="tx"><b>自由划</b><span>不设目标,拉了就记</span></div>
+              <div class="radio"></div>
+            </div>
+            <div class="mode sel">
+              <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="8.5" width="19" height="7" rx="1.5"/><path d="M7 8.5v3M11 8.5v4M15 8.5v3M19 8.5v4"/></svg></div>
+              <div class="tx"><b>定距</b><span>划满设定距离自动结束</span></div>
+              <div class="radio"></div>
+            </div>
+            <div class="mode">
+              <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+              <div class="tx"><b>定时</b><span>划满设定时间自动结束</span></div>
+              <div class="radio"></div>
+            </div>
+            <div class="mode">
+              <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9.5-9C.5 8 3 4 7 4c2 0 3.5 1 5 3 1.5-2 3-3 5-3 4 0 6.5 4 4.5 8C19 16.5 12 21 12 21z"/></svg></div>
+              <div class="tx"><b>定卡</b><span>烧完目标卡路里结束</span></div>
+              <div class="radio"></div>
+            </div>
+            <div class="mode">
+              <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3 7 4-14 3 7h4"/></svg></div>
+              <div class="tx"><b>间歇训练</b><span>4×500m · 组间休息 1′00″</span></div>
+              <div class="radio"></div>
+            </div>
+            <div class="mode">
+              <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg></div>
+              <div class="tx"><b>目标配速</b><span>配速船 · 目标 2:00 /500m · 26 spm</span></div>
+              <div class="radio"></div>
+            </div>
+          </div>
+        </div>
+        <div class="param" id="paramBox">
+          <div class="pl" id="paramLabel">目标距离</div>
+          <div class="chips" id="paramChips">
+            <div class="c">500 m</div>
+            <div class="c">1000 m</div>
+            <div class="c on">2000 m</div>
+            <div class="c">5000 m</div>
+            <div class="c">自定义…</div>
+          </div>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--ink-3);margin:4px 4px 9px">收藏的训练</div>
+        <div class="card" style="padding:0;margin-bottom:14px">
+          <div class="list" style="box-shadow:none">
+            <div class="item"><div class="ic">★</div><div class="tx"><b>2000m 计时赛</b><span>个人最佳 8:24</span></div><div class="rt">›</div></div>
+            <div class="item"><div class="ic">★</div><div class="tx"><b>5×500m 间歇</b><span>组间休 1′00″</span></div><div class="rt">›</div></div>
+            <div class="item" style="border-bottom:0"><div class="ic">★</div><div class="tx"><b>30 分钟 UT2 有氧</b><span>目标桨频 ≤ 22</span></div><div class="rt">›</div></div>
+          </div>
+        </div>
+        <button class="btn" data-go="connecting">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <span id="startLbl">开始训练 · 定距 2000m</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ④ 实时训练仪表盘 -->
+    <section class="screen" data-screen="dashboard">
+      <div class="sysbar"><span>21:48</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar">
+        <div class="back" data-jump="connect">‹</div>
+        <div class="title">AT-R79517</div>
+        <div class="act" data-jump="raw" title="原始调试视图">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/></svg>
+        </div>
+      </div>
+      <div class="statusstrip">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
+        已连接 · 6 个服务
+        <span class="rec">📝 自动记录中</span>
+      </div>
+      <div class="body" style="padding-top:13px">
+        <div class="hero">
+          <div class="lab">配速 · 每 500m</div>
+          <div class="val">2:08<small> /500m</small></div>
+          <div class="row"><span>状态 · 运动中</span><span>均功率 150 W</span></div>
+        </div>
+        <div class="hr-band">
+          <div class="ic">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9.5-9C.5 8 3 4 7 4c2 0 3.5 1 5 3 1.5-2 3-3 5-3 4 0 6.5 4 4.5 8C19 16.5 12 21 12 21z"/></svg>
+          </div>
+          <div><div class="v">150<small> bpm</small></div></div>
+          <div class="meta">Xiaomi Watch S4 Sport<br>区间 4 · 无氧耐力</div>
+        </div>
+        <div class="grid">
+          <div class="tile"><div class="v" style="color:var(--amber)">24</div><div class="l">桨频 SPM</div></div>
+          <div class="tile"><div class="v" style="color:var(--orange)">162<small> W</small></div><div class="l">实时功率</div></div>
+          <div class="tile"><div class="v" style="color:var(--green)">1540<small> m</small></div><div class="l">距离</div></div>
+          <div class="tile"><div class="v">152</div><div class="l">桨数</div></div>
+          <div class="tile"><div class="v">6:42</div><div class="l">时间</div></div>
+          <div class="tile"><div class="v" style="color:var(--rose)">64<small> kcal</small></div><div class="l">卡路里</div></div>
+        </div>
+        <div class="card" style="padding:14px 16px 10px;margin-bottom:11px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-size:13px;font-weight:700">分段 · 每 500m</div>
+            <div class="muted" style="font-size:11px">目标 2000m · 第 4/4 段</div>
+          </div>
+          <table class="splits">
+            <tr><th>段</th><th>配速</th><th>桨频</th><th>功率</th><th>心率</th></tr>
+            <tr><td>1 · 500m</td><td>2:18</td><td>22</td><td>134</td><td>128</td></tr>
+            <tr><td>2 · 500m</td><td>2:12</td><td>23</td><td>150</td><td>142</td></tr>
+            <tr class="best"><td>3 · 500m</td><td>2:10</td><td>24</td><td>158</td><td>150</td></tr>
+            <tr class="cur"><td>4 · 40m ▸</td><td>2:08</td><td>25</td><td>164</td><td>150</td></tr>
+          </table>
+        </div>
+        <div class="bottom-note">运动中 · 脉冲 3422 · 间隔 78 ms</div>
+        <button class="btn danger" data-go="detail">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          结束训练并保存
+        </button>
+      </div>
+    </section>
+
+    <!-- ③b 原始调试视图 -->
+    <section class="screen" data-screen="raw">
+      <div class="sysbar"><span>21:48</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar">
+        <div class="back" data-jump="dashboard">‹</div>
+        <div class="title">原始调试视图</div>
+        <div class="act"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 4h10v10M16 8L5 19"/></svg></div>
+      </div>
+      <div class="body">
+        <div class="card" style="padding:13px 15px">
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px">GATT · 5 个服务</div>
+          <div class="muted" style="font-size:12px;line-height:1.9">
+            0x1800 Generic Access<br>
+            0x1801 Generic Attribute<br>
+            0x180A Device Information<br>
+            <b style="color:var(--accent)">0xFFE0 厂商数据</b> · 特征 0xFFE4 [notify]<br>
+            f000ffc0 TI OAD(未启用)
+          </div>
+        </div>
+        <div style="font-size:12px;font-weight:700;margin:4px 4px 9px">数据日志 · 自动滚动</div>
+        <div class="raw-log">
+<span class="t">21:48:02.118</span> 0xFFE4 d=78ms len=13<br>
+AB 04 01 09 00 64 01 00 00 00 4E 0D 5C<br>
+<span class="p">⇒ 脉冲 3420 · 间隔 78ms · 运动中</span><br><br>
+<span class="t">21:48:02.196</span> 0xFFE4 d=78ms len=13<br>
+AB 04 01 09 00 64 01 00 00 00 4E 0D 5D<br>
+<span class="p">⇒ 脉冲 3421 · 间隔 78ms · 运动中</span><br><br>
+<span class="t">21:48:02.274</span> 0xFFE4 d=78ms len=13<br>
+AB 04 01 09 00 64 01 00 00 00 4E 0D 5E<br>
+<span class="p">⇒ 脉冲 3422 · 间隔 78ms · 运动中</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ④ 训练记录列表 -->
+    <section class="screen" data-screen="history">
+      <div class="sysbar"><span>21:36</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar"><div class="title">训练记录</div>
+        <div class="act"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M7 12h10M10 18h4"/></svg></div>
+      </div>
+      <div class="body">
+        <div class="seg">
+          <div class="on">列表</div>
+          <div data-jump="trends">趋势 &amp; 最佳</div>
+        </div>
+        <div class="week-sum">
+          <div><b>4</b><span>本周次数</span></div>
+          <div><b>10.3<small style="font-size:12px">km</small></b><span>本周距离</span></div>
+          <div><b>48<small style="font-size:12px">min</small></b><span>本周时长</span></div>
+        </div>
+        <div class="day-label">5 月 16 日 · 周五</div>
+        <div class="card rec-card" data-go="detail">
+          <div class="ds"><b>22:14</b><span>开始</span></div>
+          <div class="mid">
+            <div class="big">2,000 m</div>
+            <div class="meta"><span>⏱ 8:46</span><span>⚡ 2:12/500m</span><span>🔥 86 kcal</span></div>
+          </div>
+          <svg class="spark" height="34" viewBox="0 0 64 34"><polyline points="0,24 9,18 18,21 27,12 36,16 45,9 54,14 64,7" fill="none" stroke="#2F6BFF" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="day-label">5 月 15 日 · 周四</div>
+        <div class="card rec-card" data-go="detail">
+          <div class="ds"><b>07:05</b><span>开始</span></div>
+          <div class="mid">
+            <div class="big">1,500 m</div>
+            <div class="meta"><span>⏱ 7:02</span><span>⚡ 2:21/500m</span><span>🔥 57 kcal</span></div>
+          </div>
+          <svg class="spark" height="34" viewBox="0 0 64 34"><polyline points="0,20 9,22 18,15 27,18 36,13 45,17 54,11 64,15" fill="none" stroke="#22C55E" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="day-label">5 月 12 日 · 周一</div>
+        <div class="card rec-card" data-go="detail">
+          <div class="ds"><b>21:40</b><span>开始</span></div>
+          <div class="mid">
+            <div class="big">5,000 m</div>
+            <div class="meta"><span>⏱ 24:10</span><span>⚡ 2:25/500m</span><span>🔥 181 kcal</span></div>
+          </div>
+          <svg class="spark" height="34" viewBox="0 0 64 34"><polyline points="0,26 9,20 18,22 27,14 36,17 45,10 54,12 64,8" fill="none" stroke="#F59E0B" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- ⑤ 单次记录详情 -->
+    <section class="screen" data-screen="detail">
+      <div class="sysbar"><span>21:36</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar">
+        <div class="back" data-jump="history">‹</div>
+        <div class="title" style="font-size:16px">5 月 16 日 训练</div>
+        <div class="act"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg></div>
+      </div>
+      <div class="body">
+        <div class="detail-hero">
+          <div class="d">2026-05-16 · 22:14 开始</div>
+          <div class="dist">2,000 <span style="font-size:20px;color:var(--ink-2)">m</span></div>
+          <div class="dur">用时 8:46 · 198 桨 · 定距达成</div>
+        </div>
+        <div class="stat-grid">
+          <div><b style="color:var(--cyan)">2:12</b><span>平均配速</span></div>
+          <div><b style="color:var(--amber)">23</b><span>平均桨频</span></div>
+          <div><b style="color:var(--orange)">205</b><span>峰值功率 W</span></div>
+          <div><b style="color:var(--orange)">150</b><span>平均功率 W</span></div>
+          <div><b style="color:var(--rose)">86</b><span>卡路里 kcal</span></div>
+          <div><b style="color:var(--red)">156</b><span>峰值心率</span></div>
+        </div>
+        <div class="card">
+          <div class="chart-title"><i style="background:var(--cyan)"></i>配速曲线 /500m</div>
+          <svg viewBox="0 0 320 110" width="100%" height="110">
+            <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#06B6D4" stop-opacity=".22"/>
+              <stop offset="1" stop-color="#06B6D4" stop-opacity="0"/></linearGradient></defs>
+            <polyline points="0,70 40,55 80,60 120,42 160,48 200,35 240,40 280,30 320,33"
+              fill="none" stroke="#06B6D4" stroke-width="2.6" stroke-linecap="round"/>
+            <polygon points="0,70 40,55 80,60 120,42 160,48 200,35 240,40 280,30 320,33 320,110 0,110" fill="url(#g1)"/>
+          </svg>
+        </div>
+        <div class="card">
+          <div class="chart-title"><i style="background:var(--red)"></i>心率曲线 bpm</div>
+          <svg viewBox="0 0 320 100" width="100%" height="100">
+            <defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#EF4444" stop-opacity=".20"/>
+              <stop offset="1" stop-color="#EF4444" stop-opacity="0"/></linearGradient></defs>
+            <polyline points="0,80 40,66 80,58 120,52 160,46 200,42 240,38 280,34 320,40"
+              fill="none" stroke="#EF4444" stroke-width="2.6" stroke-linecap="round"/>
+            <polygon points="0,80 40,66 80,58 120,52 160,46 200,42 240,38 280,34 320,40 320,100 0,100" fill="url(#g2)"/>
+          </svg>
+        </div>
+        <div class="card">
+          <div class="chart-title"><i style="background:var(--accent)"></i>分段明细 · 每 500m</div>
+          <table class="splits">
+            <tr><th>段</th><th>用时</th><th>配速</th><th>桨频</th><th>功率</th><th>心率</th></tr>
+            <tr><td>1 · 500m</td><td>2:18</td><td>2:18</td><td>22</td><td>134</td><td>128</td></tr>
+            <tr><td>2 · 500m</td><td>2:12</td><td>2:12</td><td>23</td><td>150</td><td>142</td></tr>
+            <tr><td>3 · 500m</td><td>2:10</td><td>2:10</td><td>24</td><td>158</td><td>150</td></tr>
+            <tr class="best"><td>4 · 500m</td><td>2:06</td><td>2:06</td><td>25</td><td>168</td><td>156</td></tr>
+          </table>
+        </div>
+        <div style="display:flex;gap:11px">
+          <button class="btn ghost" style="flex:1">分享</button>
+          <button class="btn danger" style="flex:1">删除</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ⑥ 趋势 & 个人最佳 -->
+    <section class="screen" data-screen="trends">
+      <div class="sysbar"><span>21:36</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar"><div class="title">训练记录</div>
+        <div class="act"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg></div>
+      </div>
+      <div class="body">
+        <div class="seg">
+          <div data-jump="history">列表</div>
+          <div class="on">趋势 &amp; 最佳</div>
+        </div>
+        <div class="chips" style="margin-bottom:14px">
+          <div class="c on">近 8 周</div>
+          <div class="c">今年</div>
+          <div class="c">全部</div>
+        </div>
+        <div class="week-sum">
+          <div><b>31</b><span>训练次数</span></div>
+          <div><b>58<small style="font-size:12px">km</small></b><span>总距离</span></div>
+          <div><b>7.3<small style="font-size:12px">h</small></b><span>总时长</span></div>
+        </div>
+        <div class="card">
+          <div class="chart-title"><i style="background:var(--accent)"></i>每周距离 (km)</div>
+          <div class="bars">
+            <div class="b" style="height:38%"><span>W1</span></div>
+            <div class="b" style="height:55%"><span>W2</span></div>
+            <div class="b" style="height:30%"><span>W3</span></div>
+            <div class="b" style="height:62%"><span>W4</span></div>
+            <div class="b" style="height:48%"><span>W5</span></div>
+            <div class="b" style="height:74%"><span>W6</span></div>
+            <div class="b peak" style="height:100%"><span>W7</span></div>
+            <div class="b" style="height:67%"><span>本周</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="chart-title"><i style="background:var(--cyan)"></i>平均配速趋势 <span style="color:var(--ink-3);font-weight:600;font-size:11px;margin-left:4px">越低越快 ↓</span></div>
+          <svg viewBox="0 0 320 100" width="100%" height="100">
+            <defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#06B6D4" stop-opacity=".2"/><stop offset="1" stop-color="#06B6D4" stop-opacity="0"/></linearGradient></defs>
+            <polyline points="0,30 45,38 90,34 135,46 180,52 225,60 270,66 320,74" fill="none" stroke="#06B6D4" stroke-width="2.6" stroke-linecap="round"/>
+            <polygon points="0,30 45,38 90,34 135,46 180,52 225,60 270,66 320,74 320,100 0,100" fill="url(#g3)"/>
+          </svg>
+        </div>
+        <div class="streak">🔥 连续打卡 5 天 · 历史最长 9 天</div>
+        <div style="font-size:12px;font-weight:700;color:var(--ink-3);margin:2px 4px 9px">个人最佳 (PR)</div>
+        <div class="card" style="padding:0">
+          <div class="list" style="box-shadow:none">
+            <div class="item"><div class="tx"><b>500 m</b><span>2026-04-22</span></div><div class="rt" style="font-size:17px;font-weight:800;color:var(--ink)">1:48</div></div>
+            <div class="item"><div class="tx"><b>1000 m</b><span>2026-05-02</span></div><div class="rt" style="font-size:17px;font-weight:800;color:var(--ink)">3:55</div></div>
+            <div class="item"><div class="tx"><b>2000 m</b><span>2026-05-12</span></div><div class="rt" style="font-size:17px;font-weight:800;color:var(--ink)">8:24</div></div>
+            <div class="item"><div class="tx"><b>5000 m</b><span>2026-04-30</span></div><div class="rt" style="font-size:17px;font-weight:800;color:var(--ink)">22:10</div></div>
+            <div class="item"><div class="tx"><b>最长单次距离</b><span>2026-04-30</span></div><div class="rt" style="font-size:17px;font-weight:800;color:var(--ink)">5,000 m</div></div>
+            <div class="item" style="border-bottom:0"><div class="tx"><b>最长单次时长</b><span>2026-05-12</span></div><div class="rt" style="font-size:17px;font-weight:800;color:var(--ink)">28:11</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ⑧ 我的 / 多用户 -->
+    <section class="screen" data-screen="profile">
+      <div class="sysbar"><span>21:36</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar"><div class="title">我的</div>
+        <div class="act" data-jump="settings"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></div>
+      </div>
+      <div class="body">
+        <div class="me-head">
+          <div class="avatar">房</div>
+          <div class="nm"><b>房总</b><span>本地账号 · 数据存本机</span></div>
+          <div class="switch" data-jump="userswitch">切换 ›</div>
+        </div>
+        <div class="me-stats">
+          <div><b>38</b><span>累计训练</span></div>
+          <div><b>74<small style="font-size:11px">km</small></b><span>累计距离</span></div>
+          <div><b>9.2<small style="font-size:11px">h</small></b><span>累计时长</span></div>
+        </div>
+        <div class="list">
+          <div class="item" data-jump="userswitch">
+            <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.4"/><path d="M3 20c0-3.5 3-5 6-5s6 1.5 6 5"/><path d="M17 8h5M19.5 5.5v5"/></svg></div>
+            <div class="tx"><b>切换 / 添加用户</b><span>每人独立训练记录</span></div>
+            <div class="rt">房总 ›</div>
+          </div>
+          <div class="item" data-jump="settings">
+            <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9.5-9C.5 8 3 4 7 4c2 0 3.5 1 5 3 1.5-2 3-3 5-3 4 0 6.5 4 4.5 8C19 16.5 12 21 12 21z"/></svg></div>
+            <div class="tx"><b>心率设备</b><span>已连接 Xiaomi Watch S4 Sport</span></div>
+            <div class="rt">›</div>
+          </div>
+          <div class="item" data-jump="settings">
+            <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16M4 12l4-4M4 12l4 4"/><circle cx="19" cy="12" r="2"/></svg></div>
+            <div class="tx"><b>训练标定</b><span>米/脉冲 0.45 · 功率系数 k 2.80</span></div>
+            <div class="rt">›</div>
+          </div>
+          <div class="item" data-jump="connect">
+            <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg></div>
+            <div class="tx"><b>划船机设备</b><span>AT-R79517 · 已记住</span></div>
+            <div class="rt">›</div>
+          </div>
+          <div class="item">
+            <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M8 11l4 4 4-4M4 21h16"/></svg></div>
+            <div class="tx"><b>导出数据</b><span>导出全部训练记录 CSV</span></div>
+            <div class="rt">›</div>
+          </div>
+          <div class="item">
+            <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg></div>
+            <div class="tx"><b>关于</b><span>v0.2 冒烟版 · 自建 Anytum 协议</span></div>
+            <div class="rt">›</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ⑦ 切换 / 添加用户 -->
+    <section class="screen" data-screen="userswitch">
+      <div class="sysbar"><span>21:36</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar">
+        <div class="back" data-jump="profile">‹</div>
+        <div class="title">切换用户</div>
+      </div>
+      <div class="body">
+        <div class="muted" style="margin:4px 4px 12px;font-size:12.5px">每个用户独立的训练记录与档案,数据保存在本机。</div>
+        <div class="list">
+          <div class="user-row">
+            <div class="av" style="background:linear-gradient(150deg,#3D7BFF,#2F6BFF)">房</div>
+            <div class="info"><b>房总</b><span>38 次 · 74 km · 当前使用</span></div>
+            <div class="chk"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l4 4L19 7"/></svg></div>
+          </div>
+          <div class="user-row">
+            <div class="av" style="background:linear-gradient(150deg,#22C55E,#16A34A)">嫂</div>
+            <div class="info"><b>夫人</b><span>11 次 · 18 km</span></div>
+            <div class="rt" style="color:var(--ink-3)">›</div>
+          </div>
+          <div class="user-row" style="border-bottom:0">
+            <div class="av" style="background:linear-gradient(150deg,#F59E0B,#F97316)">儿</div>
+            <div class="info"><b>小朋友</b><span>3 次 · 2 km</span></div>
+            <div class="rt" style="color:var(--ink-3)">›</div>
+          </div>
+        </div>
+        <div style="height:16px"></div>
+        <button class="btn ghost">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          添加新用户
+        </button>
+      </div>
+    </section>
+
+    <!-- ⑧ 训练标定 / 心率设备 -->
+    <section class="screen" data-screen="settings">
+      <div class="sysbar"><span>21:36</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar">
+        <div class="back" data-jump="profile">‹</div>
+        <div class="title">训练标定</div>
+      </div>
+      <div class="body">
+        <div class="card">
+          <div class="set-block">
+            <div class="sl-lab"><span>米 / 脉冲</span><b>0.45 m</b></div>
+            <div class="track"><div class="fill" style="width:45%"></div><div class="knob" style="left:45%"></div></div>
+            <div class="set-note">划船机无屏幕、无绝对参照,距离 = 飞轮脉冲 × 此系数。每桨约 23 脉冲 ≈ 10.4 m,与赛艇经验一致。有参照时再调。</div>
+          </div>
+          <div class="set-block" style="margin-top:20px">
+            <div class="sl-lab"><span>功率系数 k</span><b>2.80</b></div>
+            <div class="track"><div class="fill" style="width:56%"></div><div class="knob" style="left:56%"></div></div>
+            <div class="set-note">Concept2 模型:功率 = k · 速度³。2.80 为其公开取值。</div>
+          </div>
+          <div class="set-block" style="margin-top:20px">
+            <div class="sl-lab"><span>抓水阈值 (高 / 低 ms)</span><b>220 / 150</b></div>
+            <div class="track"><div class="fill" style="width:62%"></div><div class="knob" style="left:62%"></div></div>
+            <div class="set-note">间隔升过高阈再跌破低阈记一桨,跨多包也能命中。</div>
+          </div>
+        </div>
+        <div class="card" style="padding:0">
+          <div class="list" style="box-shadow:none">
+            <div class="item">
+              <div class="ic" style="background:#FFE0E3;color:var(--red)"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9.5-9C.5 8 3 4 7 4c2 0 3.5 1 5 3 1.5-2 3-3 5-3 4 0 6.5 4 4.5 8C19 16.5 12 21 12 21z"/></svg></div>
+              <div class="tx"><b>心率设备</b><span>Xiaomi Watch S4 Sport · 0x180D</span></div>
+              <div class="pill" style="background:#E9F8EF;color:var(--ok)">已连接</div>
+            </div>
+            <div class="item" style="border-bottom:0">
+              <div class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></div>
+              <div class="tx"><b>重新扫描心率带</b><span>支持标准 BLE 心率 (Polar / Magene 等)</span></div>
+              <div class="rt">›</div>
+            </div>
+          </div>
+        </div>
+        <button class="btn">保存标定</button>
+      </div>
+    </section>
+
+    <!-- 边界态:蓝牙未开启 -->
+    <section class="screen" data-screen="btoff">
+      <div class="sysbar"><span>21:36</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar"><div class="title">小莫划船机</div></div>
+      <div class="banner">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 9v5M12 17.5v.5"/><path d="M10.3 3.3 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0Z"/></svg>
+        蓝牙未开启 — 请到系统设置打开蓝牙后重试
+      </div>
+      <div class="connect-wrap">
+        <div class="rower-badge" style="background:linear-gradient(150deg,#AEB7C7,#9AA4B6);box-shadow:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M5 6h5l4 6 4-3"/><path d="M9 12l3 6"/></svg>
+        </div>
+        <div class="dev-name">小莫划船机</div>
+        <div class="dev-sub">AT-R79517 · 等待蓝牙开启</div>
+        <div style="height:30px"></div>
+        <button class="btn disabled lg" style="max-width:264px">开始划船</button>
+        <div class="link" style="margin-top:14px">前往系统蓝牙设置</div>
+        <div class="link" data-jump="connect" style="margin-top:auto;padding-bottom:22px">蓝牙已打开?重新检测</div>
+      </div>
+    </section>
+
+    <!-- 边界态:连接失败(重试 8 次后) -->
+    <section class="screen" data-screen="connfail">
+      <div class="sysbar"><span>21:41</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar"><div class="title"></div></div>
+      <div class="conn-wrap">
+        <div class="ok-badge" style="background:#FDEBEC;color:var(--red)">
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/></svg>
+        </div>
+        <h2>连接失败</h2>
+        <div class="conn-msg">已重试 8 次仍连不上 AT-R79517</div>
+        <div class="conn-tip">确认划船机已通电,并拉一下手柄唤醒它;<br>太远或被遮挡也会连不上</div>
+        <button class="btn" data-go="connecting" style="max-width:240px;margin-top:26px">重试连接</button>
+        <div class="link" data-jump="alldevices" style="margin-top:14px">手动选择蓝牙设备</div>
+        <div class="link" data-jump="connect" style="margin-top:4px">返回</div>
+      </div>
+    </section>
+
+    <!-- 边界态:心率信号弱 -->
+    <section class="screen" data-screen="hrweak">
+      <div class="sysbar"><span>21:50</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar">
+        <div class="back" data-jump="dashboard">‹</div>
+        <div class="title">AT-R79517</div>
+      </div>
+      <div class="statusstrip">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
+        已连接 · 6 个服务<span class="rec">📝 自动记录中</span>
+      </div>
+      <div class="body" style="padding-top:13px">
+        <div class="hero">
+          <div class="lab">配速 · 每 500m</div>
+          <div class="val">2:08<small> /500m</small></div>
+          <div class="row"><span>状态 · 运动中</span><span>均功率 150 W</span></div>
+        </div>
+        <div class="hr-band" style="background:#F1F3F7">
+          <div class="ic" style="background:#E2E6EC;color:var(--ink-3)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9.5-9C.5 8 3 4 7 4c2 0 3.5 1 5 3 1.5-2 3-3 5-3 4 0 6.5 4 4.5 8C19 16.5 12 21 12 21z"/></svg>
+          </div>
+          <div><div class="v" style="color:var(--ink-3)">-- <small>bpm</small></div></div>
+          <div class="meta" style="color:var(--red)">⚠ 心率信号弱<br>&gt;5s 无数据,检查手表广播</div>
+        </div>
+        <div class="muted" style="font-size:12px;padding:2px 4px 10px">心率掉线时仪表盘照常记录,恢复后自动续上;此次训练心率字段标记为"部分缺失"。</div>
+        <div class="grid">
+          <div class="tile"><div class="v" style="color:var(--amber)">24</div><div class="l">桨频 SPM</div></div>
+          <div class="tile"><div class="v" style="color:var(--orange)">162<small> W</small></div><div class="l">实时功率</div></div>
+          <div class="tile"><div class="v" style="color:var(--green)">1540<small> m</small></div><div class="l">距离</div></div>
+          <div class="tile"><div class="v">152</div><div class="l">桨数</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 空状态:无训练记录 -->
+    <section class="screen" data-screen="histempty">
+      <div class="sysbar"><span>21:36</span><span class="r"><svg class="sig" viewBox="0 0 19 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="5.3" y="5" width="3" height="6" rx="1"/><rect x="10.6" y="2.5" width="3" height="8.5" rx="1"/><rect x="15.9" y="0" width="3" height="11" rx="1"/></svg><span class="net">5G</span><svg class="bat" viewBox="0 0 27 13"><rect class="shell" x="0.7" y="0.7" width="22" height="11.6" rx="3"/><rect class="lvl" x="2.6" y="2.6" width="14" height="7.8" rx="1.4"/><rect class="lvl" x="24" y="4" width="2.4" height="5" rx="1.2"/></svg></span></div>
+      <div class="appbar"><div class="title">训练记录</div></div>
+      <div class="empty">
+        <div class="ill">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/><path d="M5 6h5l4 6 4-3"/><path d="M9 12l3 6"/></svg>
+        </div>
+        <h3>还没有训练记录</h3>
+        <p>连接划船机,拉第一桨就开始自动记录。<br>每次训练的配速、距离、卡路里都会存在这里。</p>
+        <button class="btn lg" data-go="connecting" style="max-width:240px;margin-top:20px">开始第一次训练</button>
+      </div>
+    </section>
+
+    <nav class="tabbar" id="tabbar">
+      <div class="tab" data-tab="connect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M5 6h5l4 6 4-3"/></svg>训练</div>
+      <div class="tab" data-tab="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg>记录</div>
+      <div class="tab" data-tab="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>我的</div>
+    </nav>
+
+  </div>
+</div>
+</div>
+
+<script>
+  const screens = document.querySelectorAll('.screen');
+  const jumpBtns = document.querySelectorAll('.nav-pane button[data-jump]');
+  let timers = [];
+  function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
+  const tabOf = { history:'history', trends:'history', detail:'history',
+                  histempty:'history',
+                  profile:'profile', userswitch:'profile', settings:'profile' };
+  const noTabs = ['connecting','ready','connfail'];
+  function show(id){
+    clearTimers();
+    screens.forEach(s=>s.classList.toggle('active', s.dataset.screen===id));
+    jumpBtns.forEach(b=>b.classList.toggle('on', b.dataset.jump===id));
+    const tabbar = document.getElementById('tabbar');
+    const active = tabOf[id] || 'connect';
+    tabbar.classList.toggle('hidden', noTabs.includes(id));
+    tabbar.querySelectorAll('.tab').forEach(
+      t => t.classList.toggle('on', t.dataset.tab===active));
+    const host = document.querySelector('.screen.active .body');
+    if(host) host.scrollTop = 0;
+    if(id==='connecting') runConnect();
+    if(id==='ready') runCountdown();
+  }
+  function runConnect(){
+    const el = document.getElementById('connMsg');
+    const seq = [['正在扫描划船机…',0],
+                 ['已发现 AT-R79517 · 信号良好',1000],
+                 ['正在建立连接…',1900]];
+    seq.forEach(([t,d])=> timers.push(setTimeout(()=>{ if(el) el.textContent=t; }, d)));
+    timers.push(setTimeout(()=> show('ready'), 2900));
+  }
+  function runCountdown(){
+    const el = document.getElementById('cdNum');
+    let n = 3;
+    if(el) el.textContent = n;
+    const tick = ()=>{
+      n--;
+      if(n > 0){ if(el) el.textContent = n; timers.push(setTimeout(tick, 800)); }
+      else { if(el) el.textContent = 'GO'; timers.push(setTimeout(()=> show('dashboard'), 650)); }
+    };
+    timers.push(setTimeout(tick, 800));
+  }
+  const paramCfg = {
+    '自由划':   null,
+    '定距':     ['目标距离', ['500 m','1000 m','2000 m','5000 m','自定义…'], 2, '定距'],
+    '定时':     ['目标时间', ['5 min','10 min','20 min','30 min','自定义…'], 2, '定时'],
+    '定卡':     ['目标卡路里', ['50 kcal','100 kcal','200 kcal','300 kcal','自定义…'], 1, '定卡'],
+    '间歇训练': ['间歇方案', ['4×500m','5×500m','6×250m','8×250m','自定义…'], 1, '间歇'],
+    '目标配速': ['目标配速 /500m', ['1:50','1:55','2:00','2:05','自定义…'], 2, '配速']
+  };
+  function setStart(mode, val){
+    const l = document.getElementById('startLbl');
+    if(l) l.textContent = val ? ('开始训练 · '+mode+' '+val)
+                               : ('开始训练 · '+mode);
+  }
+  function selectMode(el){
+    document.querySelectorAll('[data-screen="goalsetup"] .mode')
+      .forEach(m=>m.classList.remove('sel'));
+    el.classList.add('sel');
+    const name = el.querySelector('.tx b').textContent.trim();
+    const box = document.getElementById('paramBox');
+    const cfg = paramCfg[name];
+    if(!cfg){ box.style.display='none'; setStart(name,''); return; }
+    box.style.display='';
+    document.getElementById('paramLabel').textContent = cfg[0];
+    document.getElementById('paramChips').innerHTML = cfg[1].map(
+      (t,i)=>'<div class="c'+(i===cfg[2]?' on':'')+'">'+t+'</div>').join('');
+    setStart(cfg[3], cfg[1][cfg[2]]);
+  }
+  document.addEventListener('click', e=>{
+    const mode = e.target.closest('[data-screen="goalsetup"] .mode');
+    if(mode){ selectMode(mode); return; }
+    const chip = e.target.closest('.chips .c');
+    if(chip){
+      const grp = chip.parentElement;
+      grp.querySelectorAll('.c').forEach(c=>c.classList.remove('on'));
+      chip.classList.add('on');
+      if(grp.id==='paramChips'){
+        const sel = document.querySelector(
+          '[data-screen="goalsetup"] .mode.sel .tx b');
+        const cfg = sel && paramCfg[sel.textContent.trim()];
+        if(cfg) setStart(cfg[3], chip.textContent.trim());
+      }
+      return;
+    }
+    const t = e.target.closest('[data-jump],[data-go],[data-tab]');
+    if(!t) return;
+    show(t.dataset.jump || t.dataset.go || t.dataset.tab);
+  });
+  show('connect');
+</script>
+</body>
+</html>
