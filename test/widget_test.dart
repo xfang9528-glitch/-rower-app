@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rower_app/ble/anytum_rower.dart';
 import 'package:rower_app/ble/rowing_metrics.dart';
 import 'package:rower_app/data/json_file.dart';
+import 'package:rower_app/session/workout_recorder.dart';
 import 'package:rower_app/models/training_goal.dart';
 import 'package:rower_app/models/workout.dart';
 import 'package:rower_app/util/fmt.dart';
@@ -60,6 +61,31 @@ void main() {
 
     test('不存在返回 null', () async {
       expect(await JsonFile.readMap(File('${dir.path}/none.json')), isNull);
+    });
+  });
+
+  group('有效时长(回归:停桨 90s 收尾污染 duration/卡路里/配速)', () {
+    test('停桨尾段被剔除,只留划动+宽限', () {
+      // 划到第 130s 停,90s 后才自动收尾:墙钟 220s,有效应 ~135s
+      expect(
+        WorkoutRecorder.effectiveDuration(
+            everMoved: true, lastMoveMs: 130000, wallSec: 220),
+        135, // 130 + 5 宽限
+      );
+    });
+    test('全程在划:有效=墙钟(宽限不超额)', () {
+      expect(
+        WorkoutRecorder.effectiveDuration(
+            everMoved: true, lastMoveMs: 300000, wallSec: 300),
+        300,
+      );
+    });
+    test('没划过 → 0(配合太短不存)', () {
+      expect(
+        WorkoutRecorder.effectiveDuration(
+            everMoved: false, lastMoveMs: 0, wallSec: 95),
+        0,
+      );
     });
   });
 

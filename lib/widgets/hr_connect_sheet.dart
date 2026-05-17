@@ -116,6 +116,7 @@ class _HrSheetState extends State<_HrSheet> {
                               if (ok) {
                                 await appState.settings.rememberHrDevice(
                                     d.deviceId, name);
+                                appState.refresh(); // 标定/我的「已记住」即时更新
                               }
                               if (!context.mounted) return;
                               Navigator.of(context).pop();

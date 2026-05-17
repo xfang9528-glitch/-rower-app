@@ -65,8 +65,34 @@ class WorkoutRecorder extends ChangeNotifier {
   bool finished = false;
   Workout? result;
 
+  /// 墙钟时长(实时显示用,PRD §4.1:停桨不暂停)。
   Duration get elapsed => DateTime.now().difference(startTime);
   int get elapsedSec => elapsed.inSeconds;
+
+  /// 末段静置宽限(秒):保留最后一桨的滑行,不算进有效时长。
+  static const int tailGraceSec = 5;
+
+  /// 有效时长(秒)= 起始 → 最后一次划动 + 宽限,且不超过墙钟。
+  /// 卡路里/平均配速/落盘 durationSec 用它:停桨自动收尾的 90s 检测
+  /// 延迟(及任何尾部静置)不会污染记录;中途间歇休息因后续仍有划动
+  /// 会更新 _lastMoving,不受影响。墙钟值仅留实时计时显示。
+  int get effectiveSec => effectiveDuration(
+        everMoved: _everMoved,
+        lastMoveMs: _lastMoving.difference(startTime).inMilliseconds,
+        wallSec: elapsedSec,
+      );
+
+  /// 纯函数(可单测):有效时长 = min(墙钟, 最后划动+宽限);没划过 = 0。
+  static int effectiveDuration({
+    required bool everMoved,
+    required int lastMoveMs,
+    required int wallSec,
+    int grace = tailGraceSec,
+  }) {
+    if (!everMoved) return 0;
+    final eff = (lastMoveMs / 1000.0 + grace).round();
+    return eff < wallSec ? eff : wallSec;
+  }
 
   void start() {
     conn.resetHrSessionFlag();
@@ -111,8 +137,9 @@ class WorkoutRecorder extends ChangeNotifier {
 
   void _tick() {
     // 卡路里:Concept2 公开模型 Cal/hr = 4·W·0.8604 + 300(无参照估算)。
+    // 用有效时长 → 停桨后实时卡路里也停涨,与落盘值一致(PRD §4.3)。
     final avgP = metrics.avgPowerW;
-    calories = ((4 * avgP * 0.8604) + 300) / 3600 * elapsedSec;
+    calories = ((4 * avgP * 0.8604) + 300) / 3600 * effectiveSec;
 
     // 心率累计 + 曲线采样
     final hr = conn.hrBpm;
@@ -178,7 +205,8 @@ class WorkoutRecorder extends ChangeNotifier {
   void _closeTailSplit() {
     final tail = metrics.distanceM - _splitStartDist;
     if (tail < 20) return; // 太短不单列
-    final segMs = elapsed.inMilliseconds - _splitStartElapsedMs;
+    // 用有效时长结尾,避免尾部静置 90s 进入末段。
+    final segMs = effectiveSec * 1000 - _splitStartElapsedMs;
     splits.add(Split(
       index: _splitIndex,
       distanceM: tail,
@@ -198,12 +226,14 @@ class WorkoutRecorder extends ChangeNotifier {
     _closeTailSplit();
 
     final dist = metrics.distanceM;
-    if (elapsedSec < 30 || metrics.strokeCount < 3 || dist < 20) {
+    final dur = effectiveSec; // 有效时长:不含尾部静置/收尾检测延迟
+    if (dur < 30 || metrics.strokeCount < 3 || dist < 20) {
       result = null;
       notifyListeners();
       return null;
     }
-    final dur = elapsedSec;
+    // 卡路里按有效时长定稿(与实时一致,避免尾部静置虚高)。
+    calories = ((4 * metrics.avgPowerW * 0.8604) + 300) / 3600 * dur;
     result = Workout(
       id: 'w_${startTime.millisecondsSinceEpoch}',
       userId: '', // 由调用方(AppState)填当前用户

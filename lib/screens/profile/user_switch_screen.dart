@@ -82,7 +82,7 @@ class _UserSwitchScreenState extends State<UserSwitchScreen> {
     final s = _summ[u.id];
     final sub = s == null
         ? '…'
-        : '${s.count} 次 · ${(s.distM / 1000).toStringAsFixed(0)} km'
+        : '${s.count} 次 · ${(s.distM / 1000).toStringAsFixed(1)} km'
             '${current ? " · 当前使用" : ""}';
     return InkWell(
       onTap: current

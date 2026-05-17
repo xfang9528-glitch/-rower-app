@@ -93,7 +93,7 @@ class DetailScreen extends StatelessWidget {
             const SizedBox(height: 16),
             _statGrid(w, pace),
             const SizedBox(height: 14),
-            _chartCard('配速曲线 /500m', AppColors.pace,
+            _chartCard('配速曲线 /500m  (越低越快 ↓)', AppColors.pace,
                 LineChart(data: w.paceSeries, color: AppColors.pace)),
             if (w.hrSeries.isNotEmpty)
               _chartCard('心率曲线 bpm', AppColors.heart,
