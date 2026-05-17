@@ -25,24 +25,7 @@
   }
   .stage{ position:relative; width:min(412px,100vw); height:100vh; }
 
-  /* ---------- 左侧屏幕导航(评审用,非 App 一部分) ---------- */
-  .nav-pane{ width:228px; flex:0 0 228px; position:sticky; top:34px; }
-  .nav-pane h1{ font-size:16px; margin-bottom:4px; }
-  .nav-pane .sub{ font-size:12px; color:var(--ink-2); margin-bottom:16px; line-height:1.5; }
-  .nav-pane .grp{ font-size:11px; color:var(--ink-3); letter-spacing:.08em;
-    margin:16px 0 7px; text-transform:uppercase; }
-  .nav-pane button{
-    display:block; width:100%; text-align:left; border:0; cursor:pointer;
-    background:#fff; color:var(--ink); font-size:13px; padding:9px 12px;
-    border-radius:11px; margin-bottom:6px; box-shadow:var(--shadow);
-    transition:.15s; font-family:inherit;
-  }
-  .nav-pane button:hover{ transform:translateX(2px); }
-  .nav-pane button.on{ background:var(--accent); color:#fff; }
-  .nav-pane .spec{ margin-top:18px; font-size:11px; color:var(--ink-3);
-    line-height:1.7; border-top:1px solid #cdd5e1; padding-top:12px; }
-
-  /* ---------- 手机外框:小米 17 Pro  1220x2656 物理 → 412x897 CSS ---------- */
+  /* App 容器:小米 17 Pro 1220x2656 物理,逻辑宽 412,全屏铺满视口 */
   .phone{
     width:100%; height:100%; position:relative;
     background:var(--bg); overflow:hidden;
@@ -51,7 +34,6 @@
     position:absolute; inset:0; overflow:hidden;
     background:var(--bg);
   }
-  .punch{ display:none; }
 
   .screen{ position:absolute; inset:0; display:none; flex-direction:column;
     background:var(--bg); }
@@ -387,9 +369,6 @@
   .tabbar .tab:active{ opacity:.55; }
   @keyframes scrIn{ from{ opacity:0; } to{ opacity:1; } }
   .screen.active{ animation:scrIn .2s ease; }
-
-  /* 手机按视口等比缩放,见底部 fitPhone() —— 浏览器自身缩放,
-     渲染与点击坐标一致,不会出现"看到的和点到的错位" */
 </style>
 </head>
 <body>
@@ -397,7 +376,6 @@
 <div class="stage" id="stage">
 <div class="phone" id="phone">
   <div class="screen-host">
-    <div class="punch"></div>
 
     <!-- ① 连接划船机 -->
     <section class="screen active" data-screen="connect">
@@ -582,7 +560,7 @@
       </div>
       <div class="statusstrip">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
-        已连接 · 6 个服务
+        已连接 · 5 个服务
         <span class="rec">📝 自动记录中</span>
       </div>
       <div class="body" style="padding-top:13px">
@@ -870,7 +848,7 @@ AB 04 01 09 00 64 01 00 00 00 4E 0D 5E<br>
           </div>
           <div class="item">
             <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg></div>
-            <div class="tx"><b>关于</b><span>v0.2 冒烟版 · 自建 Anytum 协议</span></div>
+            <div class="tx"><b>关于</b><span>v0.3 高保真定稿 · 自建 Anytum 协议</span></div>
             <div class="rt">›</div>
           </div>
         </div>
@@ -1001,7 +979,7 @@ AB 04 01 09 00 64 01 00 00 00 4E 0D 5E<br>
       </div>
       <div class="statusstrip">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
-        已连接 · 6 个服务<span class="rec">📝 自动记录中</span>
+        已连接 · 5 个服务<span class="rec">📝 自动记录中</span>
       </div>
       <div class="body" style="padding-top:13px">
         <div class="hero">
@@ -1052,7 +1030,6 @@ AB 04 01 09 00 64 01 00 00 00 4E 0D 5E<br>
 
 <script>
   const screens = document.querySelectorAll('.screen');
-  const jumpBtns = document.querySelectorAll('.nav-pane button[data-jump]');
   let timers = [];
   function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
   const tabOf = { history:'history', trends:'history', detail:'history',
@@ -1062,7 +1039,6 @@ AB 04 01 09 00 64 01 00 00 00 4E 0D 5E<br>
   function show(id){
     clearTimers();
     screens.forEach(s=>s.classList.toggle('active', s.dataset.screen===id));
-    jumpBtns.forEach(b=>b.classList.toggle('on', b.dataset.jump===id));
     const tabbar = document.getElementById('tabbar');
     const active = tabOf[id] || 'connect';
     tabbar.classList.toggle('hidden', noTabs.includes(id));

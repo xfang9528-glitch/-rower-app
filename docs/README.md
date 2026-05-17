@@ -13,8 +13,7 @@
 
 ## 本地预览原型
 
-零依赖静态服务(Node):配置在 [`../.claude/launch.json`](../.claude/launch.json),启动后访问 `http://localhost:4173`。
-或直接用浏览器打开 `prototype/index.html`。
+零依赖静态服务(Node):[`../.claude/launch.json`](../.claude/launch.json) 内联了一个仅绑 `localhost:4173`、带目录穿越防护的静态 server,**它不是 Claude Code 的标准配置文件,只是"如何起预览服务"的可执行说明**。启动后访问 `http://localhost:4173`,或直接用浏览器打开 `prototype/index.html`。
 
 > 评审注意:原型按手机视口(逻辑宽 412,Xiaomi 17 Pro)全屏呈现,**全局无 transform 缩放**——务必用手机尺寸视口查看,点击与显示 1:1 对齐。
 
