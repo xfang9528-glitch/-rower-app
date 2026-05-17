@@ -1,6 +1,5 @@
-import 'dart:convert';
-
 import '../models/user_profile.dart';
+import 'json_file.dart';
 import 'local_paths.dart';
 
 /// 本地多用户:users.json = { currentUserId, users:[...] }。
@@ -19,17 +18,13 @@ class UserStore {
 
   Future<void> load() async {
     if (_loaded) return;
-    try {
-      final f = await LocalPaths.file('users.json');
-      if (await f.exists()) {
-        final j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
-        _users = ((j['users'] as List?) ?? const [])
-            .map((e) => UserProfile.fromJson((e as Map).cast<String, dynamic>()))
-            .toList();
-        _currentId = j['currentUserId'] as String? ?? '';
-      }
-    } catch (_) {
-      _users = const [];
+    final f = await LocalPaths.file('users.json');
+    final j = await JsonFile.readMap(f);
+    if (j != null) {
+      _users = ((j['users'] as List?) ?? const [])
+          .map((e) => UserProfile.fromJson((e as Map).cast<String, dynamic>()))
+          .toList();
+      _currentId = j['currentUserId'] as String? ?? '';
     }
     if (_users.isEmpty) {
       _users = const [
@@ -80,10 +75,10 @@ class UserStore {
   Future<void> _persist() async {
     try {
       final f = await LocalPaths.file('users.json');
-      await f.writeAsString(jsonEncode({
+      await JsonFile.writeAtomic(f, {
         'currentUserId': _currentId,
         'users': _users.map((u) => u.toJson()).toList(),
-      }));
+      });
     } catch (_) {}
   }
 }

@@ -44,11 +44,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _rec.start();
     _rec.addListener(_onRec);
     _conn.addListener(_onConn);
-    // 已记住的心率设备 → 后台静默重连(无需用户操作)。
+    // 已记住的心率设备 → 后台静默按名字前缀自动重连(无需用户操作;
+    // 小米表 RPA 地址轮换,不能只靠 id)。命中不了就退回手动 ❤。
     final hr = s.hrDevice;
     if (hr != null && !_conn.hrConnected) {
-      final d = _conn.hrDiscovered[hr.id];
-      if (d != null) _conn.connectHr(d);
+      _conn.autoConnectRememberedHr(hr.id, hr.name);
     }
   }
 
@@ -66,19 +66,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _onRec() {
     if (!mounted) return;
-    if (_rec.finished && !_completing) {
-      _complete(auto: true);
+    // 收尾统一走这一条路:手动按钮和停桨/达成自动收尾都先 finalizeAndStop()
+    // (同步 notifyListeners)→ 这里检测 finished → _complete()(自带重入守卫)。
+    if (_rec.finished) {
+      _complete();
       return;
     }
     setState(() {});
   }
 
-  Future<void> _finishTap() async {
-    _rec.finalizeAndStop();
-    await _complete(auto: false);
-  }
+  void _finishTap() => _rec.finalizeAndStop();
 
-  Future<void> _complete({required bool auto}) async {
+  Future<void> _complete() async {
     if (_completing) return;
     _completing = true;
     final Workout? w = _rec.result;

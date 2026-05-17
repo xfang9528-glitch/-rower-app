@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rower_app/ble/anytum_rower.dart';
 import 'package:rower_app/ble/rowing_metrics.dart';
+import 'package:rower_app/data/json_file.dart';
 import 'package:rower_app/models/training_goal.dart';
 import 'package:rower_app/models/workout.dart';
 import 'package:rower_app/util/fmt.dart';
@@ -20,6 +23,43 @@ void main() {
       expect(Fmt.dist(2000), '2,000');
       expect(Fmt.dist(950), '950');
       expect(Fmt.dist(12345), '12,345');
+    });
+  });
+
+  group('JsonFile 原子写 + 损坏留证(回归:丢全部历史风险)', () {
+    late Directory dir;
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('rower_jsonfile_test');
+    });
+    tearDown(() async {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    });
+
+    test('写入往返 + 留 .bak', () async {
+      final f = File('${dir.path}/d.json');
+      await JsonFile.writeAtomic(f, {'n': 1});
+      expect(await JsonFile.readMap(f), {'n': 1});
+      await JsonFile.writeAtomic(f, {'n': 2});
+      expect(await JsonFile.readMap(f), {'n': 2});
+      expect(await File('${f.path}.bak').exists(), isTrue); // 上一份留底
+    });
+
+    test('文件损坏 → 改名 .corrupt 留证 + 回滚 .bak,不静默丢数据', () async {
+      final f = File('${dir.path}/d.json');
+      await JsonFile.writeAtomic(f, {'good': 1}); // 第一份
+      await JsonFile.writeAtomic(f, {'good': 2}); // 现 .bak={good:1}
+      await f.writeAsString('{ this is not json'); // 模拟写一半损坏
+      final recovered = await JsonFile.readMap(f);
+      expect(recovered, {'good': 1}); // 从 .bak 回滚,而非返回空
+      final corrupt = await dir
+          .list()
+          .where((e) => e.path.contains('.corrupt.'))
+          .toList();
+      expect(corrupt, isNotEmpty); // 坏文件留证可恢复
+    });
+
+    test('不存在返回 null', () async {
+      expect(await JsonFile.readMap(File('${dir.path}/none.json')), isNull);
     });
   });
 

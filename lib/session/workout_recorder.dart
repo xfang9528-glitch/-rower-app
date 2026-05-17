@@ -130,14 +130,14 @@ class WorkoutRecorder extends ChangeNotifier {
 
     // 目标达成 → 自动收尾
     if (!finished && _goalReached()) {
-      finalizeAndStop(auto: true);
+      finalizeAndStop();
       return;
     }
     // 停桨超时 → 自动收尾
     if (!finished &&
         _everMoved &&
         DateTime.now().difference(_lastMoving).inSeconds >= autoEndSec) {
-      finalizeAndStop(auto: true);
+      finalizeAndStop();
       return;
     }
     notifyListeners();
@@ -190,7 +190,7 @@ class WorkoutRecorder extends ChangeNotifier {
   }
 
   /// 结束并产出记录。太短(<30s 或 <3 桨 或 <20m)返回 null(不存)。
-  Workout? finalizeAndStop({bool auto = false}) {
+  Workout? finalizeAndStop() {
     if (finished) return result;
     finished = true;
     _sub?.cancel();

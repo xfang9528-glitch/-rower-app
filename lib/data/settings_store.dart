@@ -1,5 +1,4 @@
-import 'dart:convert';
-
+import 'json_file.dart';
 import 'local_paths.dart';
 
 /// 一台 BLE 设备的记忆(划船机 / 心率设备)。
@@ -29,22 +28,20 @@ class SettingsStore {
 
   Future<void> load() async {
     if (_loaded) return;
-    try {
-      final f = await LocalPaths.file('settings.json');
-      if (await f.exists()) {
-        final j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
-        metersPerPulse = (j['metersPerPulse'] as num?)?.toDouble() ?? 0.45;
-        powerK = (j['powerK'] as num?)?.toDouble() ?? 2.80;
-        catchHighMs = j['catchHighMs'] as int? ?? 220;
-        catchLowMs = j['catchLowMs'] as int? ?? 150;
-        final r = j['rower'];
-        if (r is Map) rower = RememberedDevice.fromJson(r.cast<String, dynamic>());
-        final h = j['hrDevice'];
-        if (h is Map) {
-          hrDevice = RememberedDevice.fromJson(h.cast<String, dynamic>());
-        }
+    final f = await LocalPaths.file('settings.json');
+    final j = await JsonFile.readMap(f);
+    if (j != null) {
+      metersPerPulse = (j['metersPerPulse'] as num?)?.toDouble() ?? 0.45;
+      powerK = (j['powerK'] as num?)?.toDouble() ?? 2.80;
+      catchHighMs = j['catchHighMs'] as int? ?? 220;
+      catchLowMs = j['catchLowMs'] as int? ?? 150;
+      final r = j['rower'];
+      if (r is Map) rower = RememberedDevice.fromJson(r.cast<String, dynamic>());
+      final h = j['hrDevice'];
+      if (h is Map) {
+        hrDevice = RememberedDevice.fromJson(h.cast<String, dynamic>());
       }
-    } catch (_) {}
+    }
     _loaded = true;
   }
 
@@ -84,14 +81,14 @@ class SettingsStore {
   Future<void> _persist() async {
     try {
       final f = await LocalPaths.file('settings.json');
-      await f.writeAsString(jsonEncode({
+      await JsonFile.writeAtomic(f, {
         'metersPerPulse': metersPerPulse,
         'powerK': powerK,
         'catchHighMs': catchHighMs,
         'catchLowMs': catchLowMs,
         'rower': rower?.toJson(),
         'hrDevice': hrDevice?.toJson(),
-      }));
+      });
     } catch (_) {}
   }
 }

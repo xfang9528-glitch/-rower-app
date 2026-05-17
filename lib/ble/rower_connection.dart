@@ -76,6 +76,13 @@ class RowerConnection extends ChangeNotifier {
   bool hrScanning = false;
   bool _hrEverConnected = false; // 本会话曾连上 → 后续掉线记"部分缺失"
   bool hrPartial = false;
+  // 记住的心率设备自动重连目标。小米表用轮换 RPA 随机地址,by-id 记忆
+  // 跨天必失效;故按"名字前缀"匹配(小米心率广播名形如
+  // `Xiaomi Watch BPM <hex>`,前缀稳定),id 仅作快速通道。
+  String? _hrAutoId;
+  String? _hrAutoName;
+  Timer? _hrAutoStop;
+  static const String _xiaomiHrPrefix = 'Xiaomi Watch BPM';
   final _hrCtrl = StreamController<int>.broadcast();
   Stream<int> get hrStream => _hrCtrl.stream;
 
@@ -189,6 +196,16 @@ class RowerConnection extends ChangeNotifier {
     if (_scanPurpose == _ScanPurpose.hr) {
       hrDiscovered[d.deviceId] = d;
       notifyListeners();
+      if (hrDevice == null &&
+          (_hrAutoId != null || _hrAutoName != null) &&
+          _hrMatchesAuto(d)) {
+        final id = _hrAutoId, name = _hrAutoName;
+        _hrAutoId = _hrAutoName = null; // 防重入
+        _hrAutoStop?.cancel();
+        SessionLog.line('[心率] 自动重连命中 ${d.name ?? d.deviceId}'
+            '(记忆 $name / $id)');
+        connectHr(d);
+      }
       return;
     }
     final isNew = !discovered.containsKey(d.deviceId);
@@ -333,8 +350,44 @@ class RowerConnection extends ChangeNotifier {
   Future<void> stopHrScan() async {
     hrScanning = false;
     _scanPurpose = _ScanPurpose.rower;
+    _hrAutoStop?.cancel();
     await _stopScan();
     notifyListeners();
+  }
+
+  /// 进训练时调用:若记住过心率设备且未连,后台静默扫描并按"名字前缀"
+  /// 自动重连(小米表 RPA 地址轮换 → 不能只靠 id)。匹配不到就静默放弃
+  /// (退回手动 ❤),不打扰训练。最多扫 [secs] 秒。
+  Future<void> autoConnectRememberedHr(String? id, String? name,
+      {int secs = 25}) async {
+    if (hrConnected) return;
+    if ((id == null || id.isEmpty) && (name == null || name.isEmpty)) return;
+    _hrAutoId = id;
+    _hrAutoName = name;
+    await scanHr();
+    _hrAutoStop?.cancel();
+    _hrAutoStop = Timer(Duration(seconds: secs), () {
+      if (hrDevice == null) {
+        _hrAutoId = _hrAutoName = null;
+        stopHrScan();
+        SessionLog.line('[心率] 自动重连超时,未命中记住的设备');
+      }
+    });
+  }
+
+  /// 自动重连匹配:id 命中(稳定地址带)或 名字相等 或 同为小米心率广播
+  /// 前缀(RPA 地址会变,前缀稳定)。
+  bool _hrMatchesAuto(BleDevice d) {
+    if (_hrAutoId != null && _hrAutoId!.isNotEmpty &&
+        d.deviceId == _hrAutoId) {
+      return true;
+    }
+    final n = (d.name ?? d.rawName ?? '').trim();
+    if (n.isEmpty) return false;
+    final want = (_hrAutoName ?? '').trim();
+    if (want.isNotEmpty && n == want) return true;
+    return n.startsWith(_xiaomiHrPrefix) &&
+        want.startsWith(_xiaomiHrPrefix);
   }
 
   /// 连接选定心率设备并订阅 0x2A37。
@@ -355,6 +408,8 @@ class RowerConnection extends ChangeNotifier {
       hrDevice = d;
       _hrEverConnected = true;
       hrLastUpdate = DateTime.now();
+      _hrAutoId = _hrAutoName = null; // 已连上,清自动重连目标
+      _hrAutoStop?.cancel();
       SessionLog.line('[心率] 已连接 ${d.name ?? d.deviceId}');
       notifyListeners();
       return true;

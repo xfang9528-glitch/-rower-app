@@ -1,5 +1,9 @@
 import 'training_goal.dart';
 
+/// 首个本地用户 id(UserStore 播种用此值)。旧/缺字段记录的归属兜底
+/// 也用它,避免 fromJson 兜底成 'default' 而与种子用户对不上号。
+const String kDefaultUserId = 'user_local_1';
+
 /// 每 500m 一段(原型 ④/⑤ 的分段表)。最后一段可能不足 500m。
 class Split {
   final int index; // 1-based
@@ -154,7 +158,7 @@ class Workout {
 
   factory Workout.fromJson(Map<String, dynamic> j) => Workout(
         id: j['id'] as String,
-        userId: j['userId'] as String? ?? 'default',
+        userId: j['userId'] as String? ?? kDefaultUserId,
         startTime: DateTime.parse(j['startTime'] as String),
         durationSec: j['durationSec'] as int,
         goal: TrainingGoal.fromJson(

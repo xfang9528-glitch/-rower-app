@@ -1,12 +1,12 @@
-import 'dart:convert';
 import 'dart:io';
 
 import '../models/workout.dart';
+import 'json_file.dart';
 import 'local_paths.dart';
 import 'sync_backend.dart';
 
 /// 每用户一个文件 `workouts/<userId>.json`(多用户记录隔离,PRD §4.5)。
-/// 内存缓存当前用户的记录;落盘后触发同步接缝(默认 no-op)。
+/// 内存缓存当前用户的记录;落盘原子替换 + 损坏留证(见 JsonFile)。
 class WorkoutStore {
   final SyncBackend sync;
   WorkoutStore({this.sync = const NoopSyncBackend()});
@@ -22,44 +22,32 @@ class WorkoutStore {
     return File('${dir.path}${Platform.pathSeparator}$userId.json');
   }
 
+  List<Workout> _parse(Map<String, dynamic>? j) {
+    if (j == null) return [];
+    return ((j['workouts'] as List?) ?? const [])
+        .map((e) => Workout.fromJson((e as Map).cast<String, dynamic>()))
+        .toList();
+  }
+
   /// 切到某用户:载入其记录到缓存。切换用户后必须调用。
   Future<void> loadFor(String userId) async {
     _userId = userId;
-    _cache = [];
-    try {
-      final f = await _fileFor(userId);
-      if (await f.exists()) {
-        final j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
-        _cache = ((j['workouts'] as List?) ?? const [])
-            .map((e) => Workout.fromJson((e as Map).cast<String, dynamic>()))
-            .toList();
-      }
-    } catch (_) {
-      _cache = [];
-    }
+    final f = await _fileFor(userId);
+    _cache = _parse(await JsonFile.readMap(f));
     _sort();
   }
 
   /// 读某用户记录的汇总(不动当前缓存),切换用户页展示用。
   Future<({int count, double distM})> summaryFor(String userId) async {
-    try {
-      final f = await _fileFor(userId);
-      if (!await f.exists()) return (count: 0, distM: 0.0);
-      final j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
-      final list = ((j['workouts'] as List?) ?? const [])
-          .map((e) => Workout.fromJson((e as Map).cast<String, dynamic>()))
-          .toList();
-      return (
-        count: list.length,
-        distM: list.fold(0.0, (s, w) => s + w.distanceM),
-      );
-    } catch (_) {
-      return (count: 0, distM: 0.0);
-    }
+    final f = await _fileFor(userId);
+    final list = _parse(await JsonFile.readMap(f));
+    return (
+      count: list.length,
+      distM: list.fold(0.0, (s, w) => s + w.distanceM),
+    );
   }
 
-  void _sort() =>
-      _cache.sort((a, b) => b.startTime.compareTo(a.startTime));
+  void _sort() => _cache.sort((a, b) => b.startTime.compareTo(a.startTime));
 
   Future<void> add(Workout w) async {
     _cache = [..._cache, w];
@@ -79,10 +67,10 @@ class WorkoutStore {
     if (uid == null) return;
     try {
       final f = await _fileFor(uid);
-      await f.writeAsString(jsonEncode({
+      await JsonFile.writeAtomic(f, {
         'v': 1,
         'workouts': _cache.map((w) => w.toJson()).toList(),
-      }));
+      });
     } catch (_) {}
   }
 }
