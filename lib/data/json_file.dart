@@ -21,7 +21,12 @@ class JsonFile {
       try {
         await f.rename(bak.path);
       } catch (_) {
-        // 留不成 .bak 不致命,继续替换。
+        // 留不成 .bak 不致命。但 Windows 的 rename 不能覆盖已存在目标,
+        // 若 f 还在原位,后面 tmp.rename(f.path) 会再抛 → 本次保存被
+        // 静默丢弃(旧数据仍安全)。删掉 f 保证替换能成。
+        try {
+          if (await f.exists()) await f.delete();
+        } catch (_) {}
       }
     }
     await tmp.rename(f.path);
