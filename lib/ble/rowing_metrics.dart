@@ -22,6 +22,14 @@ class RowingTuning {
   /// 避免按单包间隔算导致配速在拉/回桨间狂跳。
   final double speedWindowSec;
 
+  /// 速度上限(m/s)。脉冲突发时短窗测速会瞬时飙高,经立方放大后功率
+  /// 离谱(实测见过 2500W+)。6.0 m/s ≈ 1:23/500m,已远超本机可持续
+  /// 强度,纯为掐掉数值毛刺,真实努力不会触顶。
+  final double maxSpeed;
+
+  /// 速度 EMA 平滑系数:new = old·(1-a) + raw·a。越小越稳。
+  final double speedEma;
+
   /// 抓水判定:自上一桨以来间隔曾高于 catchHighMs,随后跌破 catchLowMs
   /// 记一桨(跨多包也能命中)。
   final int catchHighMs;
@@ -31,6 +39,8 @@ class RowingTuning {
     this.metersPerPulse = 0.45,
     this.powerK = 2.80,
     this.speedWindowSec = 3.0,
+    this.maxSpeed = 6.0,
+    this.speedEma = 0.3,
     this.catchHighMs = 220,
     this.catchLowMs = 150,
   });
@@ -88,6 +98,15 @@ class RowingMetrics {
     _win.clear();
   }
 
+  /// 原始窗口速度 → EMA 平滑 + 上限。脉冲突发产生的瞬时尖峰在这里被
+  /// 压平,避免立方放大成离谱功率/卡路里(powerW/avgPowerW/recorder
+  /// 的 peakPower 都由 _speed 派生,改这一处即全链路一致回落)。
+  double _applySpeed(double raw) {
+    if (raw.isNaN || raw < 0) raw = 0;
+    final ema = _speed <= 0 ? raw : _speed * (1 - t.speedEma) + raw * t.speedEma;
+    return ema.clamp(0.0, t.maxSpeed);
+  }
+
   /// 喂入一个解析样本。返回是否产生新的一桨。
   bool add(AnytumSample s, DateTime now) {
     if (!s.moving) {
@@ -103,7 +122,8 @@ class RowingMetrics {
         }
         final span = now.difference(_win.first.key).inMilliseconds / 1000.0;
         if (span > 0.3) {
-          _speed = (_pulses - _win.first.value) * t.metersPerPulse / span;
+          _speed = _applySpeed(
+              (_pulses - _win.first.value) * t.metersPerPulse / span);
         }
       }
       return false;
@@ -130,7 +150,7 @@ class RowingMetrics {
         now.difference(_win.first.key).inMilliseconds / 1000.0;
     if (span > 0.3) {
       final dp = _pulses - _win.first.value;
-      _speed = dp * t.metersPerPulse / span;
+      _speed = _applySpeed(dp * t.metersPerPulse / span);
       _powerAccum += powerW;
       _powerSamples++;
     }
