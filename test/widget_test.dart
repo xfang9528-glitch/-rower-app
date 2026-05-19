@@ -106,6 +106,36 @@ void main() {
     });
   });
 
+  group('曲线采样保持上一有效值(#4 回归:配速/心率曲线退化成占位基线)', () {
+    test('桨间瞬时缺失沿用上一有效值,曲线连续不打断', () {
+      // 模拟逐刻读数:首个有效值前缺失 → 0;之后缺失沿用上值。
+      const readings = <int?>[null, 138, null, null, 130, null, 128];
+      var last = 0;
+      final series = <int>[];
+      for (final r in readings) {
+        last = WorkoutRecorder.curveSample(r, last);
+        series.add(last);
+      }
+      expect(series, [0, 138, 138, 138, 130, 130, 128]);
+      // 关键:有效点 >= 2,图表不会退化成占位基线
+      expect(series.where((v) => v > 0).length, greaterThanOrEqualTo(2));
+    });
+
+    test('全程缺失 → 全 0(心率源缺席时 hrSeries 仍判定为空)', () {
+      var last = 0;
+      for (final r in <int?>[null, null, null]) {
+        last = WorkoutRecorder.curveSample(r, last);
+      }
+      expect(last, 0);
+    });
+
+    test('非法读数(<=0)按缺失处理,不污染曲线', () {
+      expect(WorkoutRecorder.curveSample(0, 130), 130);
+      expect(WorkoutRecorder.curveSample(-5, 130), 130);
+      expect(WorkoutRecorder.curveSample(120, 130), 120);
+    });
+  });
+
   group('Split', () {
     test('配速按本段距离归一化(末段不足 500m 也可比)', () {
       const full = Split(
