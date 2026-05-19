@@ -106,33 +106,26 @@ void main() {
     });
   });
 
-  group('曲线采样保持上一有效值(#4 回归:配速/心率曲线退化成占位基线)', () {
-    test('桨间瞬时缺失沿用上一有效值,曲线连续不打断', () {
-      // 模拟逐刻读数:首个有效值前缺失 → 0;之后缺失沿用上值。
-      const readings = <int?>[null, 138, null, null, 130, null, 128];
-      var last = 0;
-      final series = <int>[];
-      for (final r in readings) {
-        last = WorkoutRecorder.curveSample(r, last);
-        series.add(last);
-      }
-      expect(series, [0, 138, 138, 138, 130, 130, 128]);
-      // 关键:有效点 >= 2,图表不会退化成占位基线
-      expect(series.where((v) => v > 0).length, greaterThanOrEqualTo(2));
+  group('区间配速采样(#4 回归:轻划/慢频时配速曲线全空)', () {
+    test('用累计距离算配速,不依赖瞬时速度', () {
+      // 真机复现:18spm/36W/98s/186m,瞬时 split500 全程 null。
+      // 用累计距离:每 5s 走 ~9.5m → 配速 5/9.5*500 ≈ 263 s/500m。
+      // 第 1 点(lastSec=-5,lastDist=0):dSec=6,dDist=11 → 273
+      expect(WorkoutRecorder.intervalPace(11, 1, 0, -5, 0), 273);
+      // 之后每 5s 走 9.5m
+      expect(WorkoutRecorder.intervalPace(20.5, 6, 11, 1, 273), 263);
+      expect(WorkoutRecorder.intervalPace(30, 11, 20.5, 6, 263), 263);
     });
 
-    test('全程缺失 → 全 0(心率源缺席时 hrSeries 仍判定为空)', () {
-      var last = 0;
-      for (final r in <int?>[null, null, null]) {
-        last = WorkoutRecorder.curveSample(r, last);
-      }
-      expect(last, 0);
+    test('停桨区间(距离不增)沿用上一配速,曲线不断', () {
+      // 距离没涨 → 保持上值,而非记 0 被图表滤掉
+      expect(WorkoutRecorder.intervalPace(186, 70, 186, 65, 240), 240);
+      expect(WorkoutRecorder.intervalPace(186.5, 75, 186, 70, 240), 240);
     });
 
-    test('非法读数(<=0)按缺失处理,不污染曲线', () {
-      expect(WorkoutRecorder.curveSample(0, 130), 130);
-      expect(WorkoutRecorder.curveSample(-5, 130), 130);
-      expect(WorkoutRecorder.curveSample(120, 130), 120);
+    test('未动(全程距离 0)→ 沿用初始 0(前导点图表跳过)', () {
+      expect(WorkoutRecorder.intervalPace(0, 6, 0, -5, 0), 0);
+      expect(WorkoutRecorder.intervalPace(0, 11, 0, 6, 0), 0);
     });
   });
 

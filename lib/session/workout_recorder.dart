@@ -55,12 +55,14 @@ class WorkoutRecorder extends ChangeNotifier {
   int _segHrSum = 0, _segHrCount = 0;
   static const double splitMeters = 500;
 
-  // 轻量曲线采样(详情页);每 5s 一点。配速/心率瞬时值在桨与桨之间会
-  // 短暂缺失(回桨速度跌破阈值、心率信号瞬断),用上一有效值补,保持曲线
-  // 连续 —— 否则缺失点被图表当 <=0 滤掉,曲线退化成断点/占位基线(#4)。
+  // 轻量曲线采样(详情页);每 5s 一点。配速曲线用"区间累计距离"算,
+  // 不用瞬时速度——后者在桨与桨之间(尤其轻划/慢频)长期跌破阈值,
+  // split500 恒 null,曲线全空(#4 真机复现)。累计距离单调、与分段表
+  // 同源,可靠。心率每秒刷新"上一有效值",采样刻信号瞬断时沿用。
   final List<int> paceSeries = [];
   final List<int> hrSeries = [];
   int _lastSampleSec = -5;
+  double _lastSampleDist = 0; // 上一采样刻累计距离(m)
   int _lastPaceSec = 0; // 上一有效配速(秒/500m);首个有效值前为 0
   int _lastHr = 0; // 上一有效心率(bpm);首个有效值前为 0
 
@@ -98,12 +100,18 @@ class WorkoutRecorder extends ChangeNotifier {
     return eff < wallSec ? eff : wallSec;
   }
 
-  /// 曲线采样单步(纯函数,可单测):本刻读数 [reading](null/<=0=该刻
-  /// 缺失)与上一有效值 [last]。有新值用新值;缺失则沿用 [last] 保持曲线
-  /// 连续。[last] 仍为 0 = 首个有效值尚未出现,记 0(图表按 <=0 跳过这些
-  /// 前导点)。#4 回归:不再把桨间缺失记成 0 打断曲线 → 退化成占位基线。
-  static int curveSample(int? reading, int last) =>
-      (reading != null && reading > 0) ? reading : last;
+  /// 区间配速(纯函数,可单测):本采样刻累计距离 [distM]/墙钟秒 [sec]
+  /// 与上一采样刻 [lastDistM]/[lastSec]。区间内划过(距离增量 > 1m)→
+  /// 算每 500m 秒数;否则(停桨/未动)沿用 [lastPace] 保持曲线连续。
+  /// #4:不依赖瞬时速度——轻划/慢频时它在桨间长期为 0,曲线全空;
+  /// 累计距离与分段表同源,稳。
+  static int intervalPace(
+      double distM, int sec, double lastDistM, int lastSec, int lastPace) {
+    final dDist = distM - lastDistM;
+    final dSec = sec - lastSec;
+    if (dDist > 1 && dSec > 0) return (dSec / dDist * 500).round();
+    return lastPace;
+  }
 
   void start() {
     conn.resetHrSessionFlag();
@@ -158,14 +166,16 @@ class WorkoutRecorder extends ChangeNotifier {
       _hrSum += hr;
       _hrCount++;
       if (hr > peakHr) peakHr = hr;
+      _lastHr = hr; // 每秒刷新,采样刻信号瞬断时沿用此值
     }
     if (elapsedSec - _lastSampleSec >= 5) {
-      _lastSampleSec = elapsedSec;
-      _lastPaceSec = curveSample(metrics.split500?.inSeconds, _lastPaceSec);
+      final dist = metrics.distanceM;
+      _lastPaceSec = intervalPace(
+          dist, elapsedSec, _lastSampleDist, _lastSampleSec, _lastPaceSec);
       paceSeries.add(_lastPaceSec);
-      final hrNow = (hr != null && !conn.hrSignalWeak) ? hr : null;
-      _lastHr = curveSample(hrNow, _lastHr);
       hrSeries.add(_lastHr);
+      _lastSampleDist = dist;
+      _lastSampleSec = elapsedSec;
     }
 
     // 目标达成 → 自动收尾
