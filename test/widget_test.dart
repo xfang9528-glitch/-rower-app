@@ -106,6 +106,40 @@ void main() {
     });
   });
 
+  group('区间配速采样(#4 回归:轻划/慢频时配速曲线全空)', () {
+    test('warmup 期(任一端累计距离 <10m)→ 返回 0,被图表滤掉', () {
+      // PR #5 review P2:首个非零样本若用极小距离(如 t=6 dist=2m)
+      // 推 500m 会得到 1250 s/500m,y 轴被这个离群点拉爆,后续真实
+      // 波动压成贴底直线。warmup 期强返 0,前导点图表 <=0 过滤。
+      expect(WorkoutRecorder.intervalPace(2, 6, 0, -5, 0), 0);
+      expect(WorkoutRecorder.intervalPace(8, 11, 2, 6, 0), 0);
+      // 当前点过线但上个点没过 → 仍 0(避免跨 warmup 的虚高首样本)
+      expect(WorkoutRecorder.intervalPace(15, 16, 8, 11, 0), 0);
+    });
+
+    test('两端均过 warmup → 按累计距离差算配速', () {
+      // 每 5s 走 ~10m:配速 5/10*500 = 250 s/500m
+      expect(WorkoutRecorder.intervalPace(25, 21, 15, 16, 0), 250);
+      expect(WorkoutRecorder.intervalPace(35, 26, 25, 21, 250), 250);
+    });
+
+    test('lastDistM 刚好等于 warmup 阈值 → 合法的第一个非零样本', () {
+      // 边界:lastDistM == paceWarmupM(10),`10 < 10` false → 跳出 warmup
+      // 这是房总 #5 review v2 nit 提到的「跨过 warmup 那一刻」边界
+      expect(WorkoutRecorder.intervalPace(20, 21, 10, 16, 0), 250);
+    });
+
+    test('停桨区间(距离不增)沿用上一配速,曲线不断', () {
+      expect(WorkoutRecorder.intervalPace(186, 70, 186, 65, 240), 240);
+      expect(WorkoutRecorder.intervalPace(186.5, 75, 186, 70, 240), 240);
+    });
+
+    test('未动(全程距离 0)→ 始终 0', () {
+      expect(WorkoutRecorder.intervalPace(0, 6, 0, -5, 0), 0);
+      expect(WorkoutRecorder.intervalPace(0, 11, 0, 6, 0), 0);
+    });
+  });
+
   group('Split', () {
     test('配速按本段距离归一化(末段不足 500m 也可比)', () {
       const full = Split(

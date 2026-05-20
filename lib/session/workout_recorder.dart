@@ -55,10 +55,19 @@ class WorkoutRecorder extends ChangeNotifier {
   int _segHrSum = 0, _segHrCount = 0;
   static const double splitMeters = 500;
 
-  // 轻量曲线采样(详情页);每 5s 一点
+  // 曲线采样(详情页);每 5s 一点。配速用累计距离差(不依赖瞬时速度,
+  // 轻划/慢频也稳),心率每秒刷新上次有效值、信号丢 ≥30s 才让曲线断。
   final List<int> paceSeries = [];
   final List<int> hrSeries = [];
   int _lastSampleSec = -5;
+  double _lastSampleDist = 0;
+  int _lastPaceSec = 0;
+  int _lastHr = 0;
+  int _lastHrTickSec = -999; // 上次拿到有效 HR 的墙钟秒;过 staleSec 即作废
+  static const int hrStaleSec = 30;
+  // 配速 warmup:累计距离首次到 10m 前不算配速(前 5s 用户多半在准备,
+  // 首个非零样本若用极小距离推 500m 会把 y 轴拉爆,见 #4 review)。
+  static const double paceWarmupM = 10;
 
   DateTime _lastMoving = DateTime.now();
   bool _everMoved = false;
@@ -92,6 +101,19 @@ class WorkoutRecorder extends ChangeNotifier {
     if (!everMoved) return 0;
     final eff = (lastMoveMs / 1000.0 + grace).round();
     return eff < wallSec ? eff : wallSec;
+  }
+
+  /// 区间配速(纯函数,可单测):用累计距离差算每 500m 秒数。
+  /// warmup 期(任一端累计距离未到 [paceWarmupM])返回 0,前导点被
+  /// 图表 <=0 过滤,避免首个非零样本用极小距离推爆 y 轴;
+  /// 停桨/未动(区间距离 ≤ 1m)沿用 [lastPace] 保持曲线连续。
+  static int intervalPace(
+      double distM, int sec, double lastDistM, int lastSec, int lastPace) {
+    if (distM < paceWarmupM || lastDistM < paceWarmupM) return 0;
+    final dDist = distM - lastDistM;
+    final dSec = sec - lastSec;
+    if (dDist > 1 && dSec > 0) return (dSec / dDist * 500).round();
+    return lastPace;
   }
 
   void start() {
@@ -147,12 +169,20 @@ class WorkoutRecorder extends ChangeNotifier {
       _hrSum += hr;
       _hrCount++;
       if (hr > peakHr) peakHr = hr;
+      _lastHr = hr;
+      _lastHrTickSec = elapsedSec;
+    } else if (elapsedSec - _lastHrTickSec >= hrStaleSec) {
+      // 心率信号丢 ≥ staleSec → 作废 hold 值,曲线断成两段(原型"断点=丢信号")
+      _lastHr = 0;
     }
     if (elapsedSec - _lastSampleSec >= 5) {
+      final dist = metrics.distanceM;
+      _lastPaceSec = intervalPace(
+          dist, elapsedSec, _lastSampleDist, _lastSampleSec, _lastPaceSec);
+      paceSeries.add(_lastPaceSec);
+      hrSeries.add(_lastHr);
+      _lastSampleDist = dist;
       _lastSampleSec = elapsedSec;
-      final sp = metrics.split500;
-      paceSeries.add(sp == null ? 0 : sp.inSeconds);
-      hrSeries.add((hr != null && !conn.hrSignalWeak) ? hr : 0);
     }
 
     // 目标达成 → 自动收尾

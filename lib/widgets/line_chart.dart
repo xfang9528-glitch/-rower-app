@@ -13,10 +13,10 @@ class LineChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      width: double.infinity,
-      child: CustomPaint(painter: _LinePainter(data, color)),
+    // CustomPaint 套 sized child:painter 跟随子尺寸,无需 size:。
+    return CustomPaint(
+      painter: _LinePainter(data, color),
+      child: SizedBox(width: double.infinity, height: height),
     );
   }
 }
@@ -28,8 +28,11 @@ class _LinePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final pts = <Offset>[];
-    final valid = data.where((v) => v > 0).toList();
+    // toDouble 锁定 List<double>:caller 传的常是 List<int>,直接 .reduce
+    // 会因 (num,num)=>num combine 不匹配 (int,int)=>int 运行时抛 TypeError
+    // 被 Flutter 渲染层吞掉 → 全空白(#4)。
+    final valid =
+        data.where((v) => v > 0).map((v) => v.toDouble()).toList();
     if (valid.length < 2) {
       final p = Paint()
         ..color = AppColors.line
@@ -38,10 +41,11 @@ class _LinePainter extends CustomPainter {
           Offset(size.width, size.height * 0.6), p);
       return;
     }
-    final lo = valid.reduce((a, b) => a < b ? a : b).toDouble();
-    final hi = valid.reduce((a, b) => a > b ? a : b).toDouble();
+    final lo = valid.reduce((a, b) => a < b ? a : b);
+    final hi = valid.reduce((a, b) => a > b ? a : b);
     final span = (hi - lo).abs() < 1e-6 ? 1.0 : (hi - lo);
     final n = data.length;
+    final pts = <Offset>[];
     for (var i = 0; i < n; i++) {
       final v = data[i];
       if (v <= 0) continue;
@@ -91,10 +95,9 @@ class Sparkline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 64,
-      height: 34,
-      child: CustomPaint(painter: _SparkPainter(data, color)),
+    return CustomPaint(
+      painter: _SparkPainter(data, color),
+      child: const SizedBox(width: 64, height: 34),
     );
   }
 }
@@ -106,10 +109,12 @@ class _SparkPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final valid = data.where((v) => v > 0).toList();
+    // toDouble 锁定 List<double>,同 _LinePainter(#4 同源 bug)。
+    final valid =
+        data.where((v) => v > 0).map((v) => v.toDouble()).toList();
     if (valid.length < 2) return;
-    final lo = valid.reduce((a, b) => a < b ? a : b).toDouble();
-    final hi = valid.reduce((a, b) => a > b ? a : b).toDouble();
+    final lo = valid.reduce((a, b) => a < b ? a : b);
+    final hi = valid.reduce((a, b) => a > b ? a : b);
     final span = (hi - lo).abs() < 1e-6 ? 1.0 : (hi - lo);
     final pts = <Offset>[];
     final n = data.length;
