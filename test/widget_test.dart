@@ -107,23 +107,28 @@ void main() {
   });
 
   group('区间配速采样(#4 回归:轻划/慢频时配速曲线全空)', () {
-    test('用累计距离算配速,不依赖瞬时速度', () {
-      // 真机复现:18spm/36W/98s/186m,瞬时 split500 全程 null。
-      // 用累计距离:每 5s 走 ~9.5m → 配速 5/9.5*500 ≈ 263 s/500m。
-      // 第 1 点(lastSec=-5,lastDist=0):dSec=6,dDist=11 → 273
-      expect(WorkoutRecorder.intervalPace(11, 1, 0, -5, 0), 273);
-      // 之后每 5s 走 9.5m
-      expect(WorkoutRecorder.intervalPace(20.5, 6, 11, 1, 273), 263);
-      expect(WorkoutRecorder.intervalPace(30, 11, 20.5, 6, 263), 263);
+    test('warmup 期(任一端累计距离 <10m)→ 返回 0,被图表滤掉', () {
+      // PR #5 review P2:首个非零样本若用极小距离(如 t=6 dist=2m)
+      // 推 500m 会得到 1250 s/500m,y 轴被这个离群点拉爆,后续真实
+      // 波动压成贴底直线。warmup 期强返 0,前导点图表 <=0 过滤。
+      expect(WorkoutRecorder.intervalPace(2, 6, 0, -5, 0), 0);
+      expect(WorkoutRecorder.intervalPace(8, 11, 2, 6, 0), 0);
+      // 当前点过线但上个点没过 → 仍 0(避免跨 warmup 的虚高首样本)
+      expect(WorkoutRecorder.intervalPace(15, 16, 8, 11, 0), 0);
+    });
+
+    test('两端均过 warmup → 按累计距离差算配速', () {
+      // 每 5s 走 ~10m:配速 5/10*500 = 250 s/500m
+      expect(WorkoutRecorder.intervalPace(25, 21, 15, 16, 0), 250);
+      expect(WorkoutRecorder.intervalPace(35, 26, 25, 21, 250), 250);
     });
 
     test('停桨区间(距离不增)沿用上一配速,曲线不断', () {
-      // 距离没涨 → 保持上值,而非记 0 被图表滤掉
       expect(WorkoutRecorder.intervalPace(186, 70, 186, 65, 240), 240);
       expect(WorkoutRecorder.intervalPace(186.5, 75, 186, 70, 240), 240);
     });
 
-    test('未动(全程距离 0)→ 沿用初始 0(前导点图表跳过)', () {
+    test('未动(全程距离 0)→ 始终 0', () {
       expect(WorkoutRecorder.intervalPace(0, 6, 0, -5, 0), 0);
       expect(WorkoutRecorder.intervalPace(0, 11, 0, 6, 0), 0);
     });

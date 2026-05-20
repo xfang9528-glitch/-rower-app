@@ -28,11 +28,9 @@ class _LinePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // #4 真根因:caller 传的 data 运行时常是 List<int>(Workout.paceSeries
-    // 字段类型),`List<int>.reduce` 期待 (int, int) => int combine,而
-    // 下面 lambda 在静态 List<num> 上下文被推断成 (num, num) => num,
-    // 返回类型不是 int 子类型,运行时 throw,被 Flutter 渲染层吞掉 →
-    // painter 啥都没画 → 卡片空白。先 .toDouble() 锁定 List<double>,稳。
+    // toDouble 锁定 List<double>:caller 传的常是 List<int>,直接 .reduce
+    // 会因 (num,num)=>num combine 不匹配 (int,int)=>int 运行时抛 TypeError
+    // 被 Flutter 渲染层吞掉 → 全空白(#4)。
     final valid =
         data.where((v) => v > 0).map((v) => v.toDouble()).toList();
     if (valid.length < 2) {
@@ -111,8 +109,7 @@ class _SparkPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 同 _LinePainter:toDouble 锁定 List<double>,避免 List<int>.reduce
-    // 的 combine 类型在运行时不匹配抛异常(#4 同源 bug)。
+    // toDouble 锁定 List<double>,同 _LinePainter(#4 同源 bug)。
     final valid =
         data.where((v) => v > 0).map((v) => v.toDouble()).toList();
     if (valid.length < 2) return;
