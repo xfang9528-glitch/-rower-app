@@ -15,6 +15,10 @@ void main() {
 class RowerApp extends StatelessWidget {
   const RowerApp({super.key});
 
+  /// 多 worktree 并行调试时区分窗口:`flutter run --dart-define=ISSUE_TAG=#4`
+  /// 注入,空字符串(线上/未传)时徽章不渲染,零开销。
+  static const _issueTag = String.fromEnvironment('ISSUE_TAG');
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -25,14 +29,46 @@ class RowerApp extends StatelessWidget {
       // 时限宽居中(≈ 原型 width:min(440,100vw)),两侧留 pageOuter。
       builder: (context, child) {
         final w = MediaQuery.of(context).size.width;
-        if (w <= 460 || child == null) return child ?? const SizedBox();
-        return ColoredBox(
-          color: AppColors.pageOuter,
-          child: Center(
-            child: ClipRect(
-              child: SizedBox(width: 440, child: child),
+        Widget body;
+        if (w <= 460 || child == null) {
+          body = child ?? const SizedBox();
+        } else {
+          body = ColoredBox(
+            color: AppColors.pageOuter,
+            child: Center(
+              child: ClipRect(
+                child: SizedBox(width: 440, child: child),
+              ),
             ),
-          ),
+          );
+        }
+        if (_issueTag.isEmpty) return body;
+        return Stack(
+          children: [
+            body,
+            Positioned(
+              top: 6,
+              right: 8,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade600,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    _issueTag,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
       },
       home: const _Bootstrap(),
