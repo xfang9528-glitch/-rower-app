@@ -123,6 +123,12 @@ void main() {
       expect(WorkoutRecorder.intervalPace(35, 26, 25, 21, 250), 250);
     });
 
+    test('lastDistM 刚好等于 warmup 阈值 → 合法的第一个非零样本', () {
+      // 边界:lastDistM == paceWarmupM(10),`10 < 10` false → 跳出 warmup
+      // 这是房总 #5 review v2 nit 提到的「跨过 warmup 那一刻」边界
+      expect(WorkoutRecorder.intervalPace(20, 21, 10, 16, 0), 250);
+    });
+
     test('停桨区间(距离不增)沿用上一配速,曲线不断', () {
       expect(WorkoutRecorder.intervalPace(186, 70, 186, 65, 240), 240);
       expect(WorkoutRecorder.intervalPace(186.5, 75, 186, 70, 240), 240);
