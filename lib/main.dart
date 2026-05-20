@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -16,8 +17,10 @@ class RowerApp extends StatelessWidget {
   const RowerApp({super.key});
 
   /// 多 worktree 并行调试时区分窗口:`flutter run --dart-define=ISSUE_TAG=#4`
-  /// 注入,空字符串(线上/未传)时徽章不渲染,零开销。
+  /// 注入。release 编译模式硬关(不论 dart-define 传没传,树摇消干净),
+  /// 同时空字符串也不渲染——双保险,正式版绝无徽章。
   static const _issueTag = String.fromEnvironment('ISSUE_TAG');
+  static const _badgeEnabled = !kReleaseMode && _issueTag != '';
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +45,7 @@ class RowerApp extends StatelessWidget {
             ),
           );
         }
-        if (_issueTag.isEmpty) return body;
+        if (!_badgeEnabled) return body;
         return Stack(
           children: [
             body,
