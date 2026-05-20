@@ -13,10 +13,7 @@ class LineChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // CustomPaint 套 SizedBox 子是规范写法:CustomPaint 跟随子尺寸,painter
-    // 拿到 size。反过来(SizedBox 套无 child 的 CustomPaint)在某些约束链下
-    // CustomPaint 退回 preferredSize=Size.zero,painter 收到零尺寸,什么都画
-    // 不出来——#4 真正的根因(数据其实一直在,paceSeries 正值 20 个)。
+    // CustomPaint 套 sized child:painter 跟随子尺寸,无需 size:。
     return CustomPaint(
       painter: _LinePainter(data, color),
       child: SizedBox(width: double.infinity, height: height),
@@ -31,8 +28,13 @@ class _LinePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final pts = <Offset>[];
-    final valid = data.where((v) => v > 0).toList();
+    // #4 真根因:caller 传的 data 运行时常是 List<int>(Workout.paceSeries
+    // 字段类型),`List<int>.reduce` 期待 (int, int) => int combine,而
+    // 下面 lambda 在静态 List<num> 上下文被推断成 (num, num) => num,
+    // 返回类型不是 int 子类型,运行时 throw,被 Flutter 渲染层吞掉 →
+    // painter 啥都没画 → 卡片空白。先 .toDouble() 锁定 List<double>,稳。
+    final valid =
+        data.where((v) => v > 0).map((v) => v.toDouble()).toList();
     if (valid.length < 2) {
       final p = Paint()
         ..color = AppColors.line
@@ -41,10 +43,11 @@ class _LinePainter extends CustomPainter {
           Offset(size.width, size.height * 0.6), p);
       return;
     }
-    final lo = valid.reduce((a, b) => a < b ? a : b).toDouble();
-    final hi = valid.reduce((a, b) => a > b ? a : b).toDouble();
+    final lo = valid.reduce((a, b) => a < b ? a : b);
+    final hi = valid.reduce((a, b) => a > b ? a : b);
     final span = (hi - lo).abs() < 1e-6 ? 1.0 : (hi - lo);
     final n = data.length;
+    final pts = <Offset>[];
     for (var i = 0; i < n; i++) {
       final v = data[i];
       if (v <= 0) continue;
@@ -94,7 +97,6 @@ class Sparkline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 同 LineChart:CustomPaint 套 sized child,避免 painter 收到 Size.zero。
     return CustomPaint(
       painter: _SparkPainter(data, color),
       child: const SizedBox(width: 64, height: 34),
@@ -109,10 +111,13 @@ class _SparkPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final valid = data.where((v) => v > 0).toList();
+    // 同 _LinePainter:toDouble 锁定 List<double>,避免 List<int>.reduce
+    // 的 combine 类型在运行时不匹配抛异常(#4 同源 bug)。
+    final valid =
+        data.where((v) => v > 0).map((v) => v.toDouble()).toList();
     if (valid.length < 2) return;
-    final lo = valid.reduce((a, b) => a < b ? a : b).toDouble();
-    final hi = valid.reduce((a, b) => a > b ? a : b).toDouble();
+    final lo = valid.reduce((a, b) => a < b ? a : b);
+    final hi = valid.reduce((a, b) => a > b ? a : b);
     final span = (hi - lo).abs() < 1e-6 ? 1.0 : (hi - lo);
     final pts = <Offset>[];
     final n = data.length;
