@@ -13,10 +13,13 @@ class LineChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      width: double.infinity,
-      child: CustomPaint(painter: _LinePainter(data, color)),
+    // CustomPaint 套 SizedBox 子是规范写法:CustomPaint 跟随子尺寸,painter
+    // 拿到 size。反过来(SizedBox 套无 child 的 CustomPaint)在某些约束链下
+    // CustomPaint 退回 preferredSize=Size.zero,painter 收到零尺寸,什么都画
+    // 不出来——#4 真正的根因(数据其实一直在,paceSeries 正值 20 个)。
+    return CustomPaint(
+      painter: _LinePainter(data, color),
+      child: SizedBox(width: double.infinity, height: height),
     );
   }
 }
@@ -91,10 +94,10 @@ class Sparkline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 64,
-      height: 34,
-      child: CustomPaint(painter: _SparkPainter(data, color)),
+    // 同 LineChart:CustomPaint 套 sized child,避免 painter 收到 Size.zero。
+    return CustomPaint(
+      painter: _SparkPainter(data, color),
+      child: const SizedBox(width: 64, height: 34),
     );
   }
 }
