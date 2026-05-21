@@ -59,7 +59,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     0.60,
                     (v) => setState(() => _mpp = v),
                     '划船机无屏幕、无绝对参照,距离 = 飞轮脉冲 × 此系数。'
-                        '每桨约 23 脉冲 ≈ 10.4 m,与赛艇经验一致。有参照时再调。',
+                        '默认 0.35 ≈ 每桨 8 m(Concept2 室内业余典型),功率会跟着立方变,'
+                        '偏高就调小一点,偏低调大一点。',
                   ),
                   const SizedBox(height: 20),
                   _slider(

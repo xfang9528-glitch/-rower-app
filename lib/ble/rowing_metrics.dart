@@ -10,9 +10,16 @@ import 'anytum_rower.dart';
 ///
 /// 标定输入(2026-05-16):每桨≈23脉冲、拉桨间隔≈70~95ms、
 /// 回桨间隔升到 250~850ms 后骤降=抓水。
+///
+/// 默认校准(issue #7, 2026-05-20):metersPerPulse 0.45 → 0.35。
+/// 旧值套的是「赛艇艇上每桨~10m」经验,但室内 Concept2 业余用户单桨
+/// 等效距离一般 7-9m。0.45 在 spm=25 推出 ~227W / 1:55 split,属精英
+/// 节奏,功率 P=k·v³ 立方放大后偏高,卡路里(由 P 派生)跟着虚高。
+/// 0.35 对应每桨 ~8m,spm=25 → ~105W / 2:29 split,业余健身合理区间。
+/// maxSpeed=6.0 只掐尖峰毛刺,不修系统性偏高;真正的解是这个系数。
 class RowingTuning {
-  /// 每个飞轮脉冲的赛艇等效距离(米)。0.45 ≈ 每桨(~23脉冲)~10.4m,
-  /// 与赛艇"每桨约10m"经验一致。有参照时调这个。
+  /// 每个飞轮脉冲的等效距离(米)。0.35 ≈ 每桨(~23脉冲)~8m,对齐
+  /// Concept2 室内业余典型(单桨 7-9m)。有参照时再调。
   final double metersPerPulse;
 
   /// Concept2 功率常数:功率(W) = k · 速度³(m/s)。2.80 为其公开取值。
@@ -36,7 +43,7 @@ class RowingTuning {
   final int catchLowMs;
 
   const RowingTuning({
-    this.metersPerPulse = 0.45,
+    this.metersPerPulse = 0.35,
     this.powerK = 2.80,
     this.speedWindowSec = 3.0,
     this.maxSpeed = 6.0,
