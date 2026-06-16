@@ -28,16 +28,21 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen>
     with WindowListener {
-  static final bool _isDesktop =
-      !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
+  // #8 浮层小窗目前只实现 + 实测了 Windows(macOS/Linux 的 window_manager
+  // 同样可用,但本仓未验证,故先不开;要开把这里放宽即可)。
+  static final bool _overlaySupported = !kIsWeb && Platform.isWindows;
 
   final _conn = RowerConnection.instance;
   late final WorkoutRecorder _rec;
   bool _completing = false;
 
-  // 浮层小窗模式(仅 Windows/macOS/Linux)
+  // 浮层小窗模式。窗口尺寸/置顶的切换由 _syncWindow 串行收敛(防 blur/focus
+  // 快速来回时的竞态:旧实现 _overlayMode 在 await 后才置位,会导致
+  // ① 已聚焦却卡小窗 ② getSize 读到未还原的小尺寸污染 _normalSize)。
   bool _overlayMode = false;
   Size _normalSize = const Size(1280, 720); // main.cpp 初始尺寸
+  bool? _desiredOverlay; // 最新意图;null = 无待处理
+  bool _syncing = false; // _syncWindow 是否在跑(串行闸)
 
   @override
   void initState() {
@@ -62,15 +67,15 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (hr != null && !_conn.hrConnected) {
       _conn.autoConnectRememberedHr(hr.id, hr.name);
     }
-    if (_isDesktop) windowManager.addListener(this);
+    if (_overlaySupported) windowManager.addListener(this);
   }
 
   @override
   void dispose() {
-    if (_isDesktop) {
+    if (_overlaySupported) {
       windowManager.removeListener(this);
       // 训练结束导航离开时确保窗口状态已还原(正常路径在 _complete 里 await 还原,
-      // 这里作为安全兜底)。
+      // 这里作为安全兜底:dispose 不能 await,fire-and-forget)。
       if (_overlayMode) {
         windowManager.setAlwaysOnTop(false);
         windowManager.setSize(_normalSize);
@@ -90,27 +95,57 @@ class _DashboardScreenState extends State<DashboardScreen>
     // 仅当仪表盘是栈顶路由才进浮层:用户若开着子页(调试页/详情页)再切出,
     // 浮层会被子页盖住、只剩被压扁的子页,所以这种情况不缩窗。
     if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
-    _enterOverlay();
+    _requestOverlay(true);
   }
 
   @override
   void onWindowFocus() {
-    if (mounted) _exitOverlay();
+    if (mounted) _requestOverlay(false);
   }
 
-  Future<void> _enterOverlay() async {
-    if (_overlayMode || _rec.finished || !mounted) return;
-    _normalSize = await windowManager.getSize();
-    await windowManager.setAlwaysOnTop(true);
-    await windowManager.setSize(const Size(260, 110));
-    if (mounted) setState(() => _overlayMode = true);
+  /// 记下最新意图并驱动收敛。blur/focus 快速来回时,中间态被折叠,
+  /// 最终只落到与焦点一致的状态。
+  void _requestOverlay(bool want) {
+    _desiredOverlay = want;
+    _syncWindow();
   }
 
-  Future<void> _exitOverlay() async {
-    if (!_overlayMode || !mounted) return;
-    setState(() => _overlayMode = false);
-    await windowManager.setAlwaysOnTop(false);
-    await windowManager.setSize(_normalSize);
+  /// 串行收敛窗口状态到 [_desiredOverlay]。`_syncing` 闸保证同一时刻只有
+  /// 一条 setSize/alwaysOnTop 序列在跑 —— 这是竞态/污染的根因:
+  /// 因为只有在 `_overlayMode == false`(窗口确在常规尺寸)时才会读
+  /// getSize() 存入 _normalSize,小窗尺寸绝不会污染 _normalSize。
+  Future<void> _syncWindow() async {
+    if (_syncing) return;
+    _syncing = true;
+    try {
+      while (mounted &&
+          _desiredOverlay != null &&
+          _desiredOverlay != _overlayMode) {
+        final want = _desiredOverlay!;
+        _desiredOverlay = null;
+        if (want) {
+          // 此刻 _overlayMode==false ⇒ 窗口为常规尺寸,读到的才是真·原尺寸。
+          _normalSize = await windowManager.getSize();
+          await windowManager.setAlwaysOnTop(true);
+          await windowManager.setSize(const Size(260, 110));
+        } else {
+          await windowManager.setAlwaysOnTop(false);
+          await windowManager.setSize(_normalSize);
+        }
+        if (mounted) setState(() => _overlayMode = want);
+      }
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  /// 训练收尾前同步还原窗口(等收敛跑完),保证导航离开时窗口干净。
+  Future<void> _restoreWindow() async {
+    _requestOverlay(false);
+    // 等串行收敛结束(_syncWindow 自带闸,这里轮询其完成)。
+    while (_syncing) {
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+    }
   }
 
   void _onConn() {
@@ -133,7 +168,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Future<void> _complete() async {
     if (_completing) return;
     _completing = true;
-    if (_isDesktop) await _exitOverlay(); // 训练结束,先还原窗口再导航
+    if (_overlaySupported) await _restoreWindow(); // 训练结束,先还原窗口再导航
     final Workout? w = _rec.result;
     await _conn.disconnectDevice();
     if (!mounted) return;
@@ -158,7 +193,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_overlayMode && _isDesktop) return _buildOverlay();
+    if (_overlayMode && _overlaySupported) return _buildOverlay();
     final m = _rec.metrics;
     final moving = _conn.lastSample?.moving ?? false;
     return PopScope(
@@ -612,7 +647,11 @@ class _DashboardScreenState extends State<DashboardScreen>
         '${el.inMinutes}:${(el.inSeconds % 60).toString().padLeft(2, '0')}';
 
     return GestureDetector(
-      onTap: _exitOverlay,
+      // 点浮层 → 把窗口拉回前台并还原(还原本身也由失焦/获焦收敛兜底)。
+      onTap: () {
+        windowManager.focus();
+        _requestOverlay(false);
+      },
       child: Container(
         color: const Color(0xFF101828),
         child: Row(
@@ -630,19 +669,27 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _overlayMetric(String icon, String value, String unit) {
     return Expanded(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('$icon $value',
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800)),
-          const SizedBox(height: 2),
-          Text(unit,
-              style:
-                  const TextStyle(color: Colors.white54, fontSize: 11)),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // 每列约 86px,长时长(100:00 三位分钟)会横向溢出 → scaleDown 自适应。
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text('$icon $value',
+                  maxLines: 1,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800)),
+            ),
+            const SizedBox(height: 2),
+            Text(unit,
+                style:
+                    const TextStyle(color: Colors.white54, fontSize: 11)),
+          ],
+        ),
       ),
     );
   }
