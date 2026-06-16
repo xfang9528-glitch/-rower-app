@@ -86,7 +86,11 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   void onWindowBlur() {
-    if (!_rec.finished && mounted) _enterOverlay();
+    if (_rec.finished || !mounted) return;
+    // 仅当仪表盘是栈顶路由才进浮层:用户若开着子页(调试页/详情页)再切出,
+    // 浮层会被子页盖住、只剩被压扁的子页,所以这种情况不缩窗。
+    if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
+    _enterOverlay();
   }
 
   @override
