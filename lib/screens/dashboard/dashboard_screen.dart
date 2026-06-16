@@ -106,9 +106,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// 记下最新意图并驱动收敛。blur/focus 快速来回时,中间态被折叠,
   /// 最终只落到与焦点一致的状态。`??=` 保证同一时刻只有一条收敛在跑,
   /// 已在跑时仅更新 _desiredOverlay,由那条的 while 循环捡起。
+  ///
+  /// 置空必须用 whenComplete(完成后的 microtask)而非 _syncWindow 内的
+  /// finally:若目标态==当前态,_syncWindow() 同步跑完(一个 await 都不命中),
+  /// finally 会在 ??= 赋值之前置空、随后又被 ??= 覆盖成已完成 future →
+  /// 字段永久非空 → 后续 _requestOverlay 全被跳过 → 浮层失效(回归)。
+  /// whenComplete 一定在赋值之后那个 microtask 才清回 null。
   void _requestOverlay(bool want) {
     _desiredOverlay = want;
-    _syncFuture ??= _syncWindow();
+    _syncFuture ??= _syncWindow()..whenComplete(() => _syncFuture = null);
   }
 
   /// 串行收敛窗口状态到 [_desiredOverlay]。同一时刻只有一条在跑
@@ -116,25 +122,21 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// 因为只有在 `_overlayMode == false`(窗口确在常规尺寸)时才会读
   /// getSize() 存入 _normalSize,小窗尺寸绝不会污染 _normalSize。
   Future<void> _syncWindow() async {
-    try {
-      while (mounted &&
-          _desiredOverlay != null &&
-          _desiredOverlay != _overlayMode) {
-        final want = _desiredOverlay!;
-        _desiredOverlay = null;
-        if (want) {
-          // 此刻 _overlayMode==false ⇒ 窗口为常规尺寸,读到的才是真·原尺寸。
-          _normalSize = await windowManager.getSize();
-          await windowManager.setAlwaysOnTop(true);
-          await windowManager.setSize(const Size(260, 110));
-        } else {
-          await windowManager.setAlwaysOnTop(false);
-          await windowManager.setSize(_normalSize);
-        }
-        if (mounted) setState(() => _overlayMode = want);
+    while (mounted &&
+        _desiredOverlay != null &&
+        _desiredOverlay != _overlayMode) {
+      final want = _desiredOverlay!;
+      _desiredOverlay = null;
+      if (want) {
+        // 此刻 _overlayMode==false ⇒ 窗口为常规尺寸,读到的才是真·原尺寸。
+        _normalSize = await windowManager.getSize();
+        await windowManager.setAlwaysOnTop(true);
+        await windowManager.setSize(const Size(260, 110));
+      } else {
+        await windowManager.setAlwaysOnTop(false);
+        await windowManager.setSize(_normalSize);
       }
-    } finally {
-      _syncFuture = null;
+      if (mounted) setState(() => _overlayMode = want);
     }
   }
 
