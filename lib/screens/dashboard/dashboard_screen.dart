@@ -1,4 +1,8 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../../app_state.dart';
 import '../../ble/rower_connection.dart';
@@ -22,10 +26,18 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with WindowListener {
+  static final bool _isDesktop =
+      !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
+
   final _conn = RowerConnection.instance;
   late final WorkoutRecorder _rec;
   bool _completing = false;
+
+  // 浮层小窗模式(仅 Windows/macOS/Linux)
+  bool _overlayMode = false;
+  Size _normalSize = const Size(1280, 720); // main.cpp 初始尺寸
 
   @override
   void initState() {
@@ -50,14 +62,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (hr != null && !_conn.hrConnected) {
       _conn.autoConnectRememberedHr(hr.id, hr.name);
     }
+    if (_isDesktop) windowManager.addListener(this);
   }
 
   @override
   void dispose() {
+    if (_isDesktop) {
+      windowManager.removeListener(this);
+      // 训练结束导航离开时确保窗口状态已还原(正常路径在 _complete 里 await 还原,
+      // 这里作为安全兜底)。
+      if (_overlayMode) {
+        windowManager.setAlwaysOnTop(false);
+        windowManager.setSize(_normalSize);
+      }
+    }
     _rec.removeListener(_onRec);
     _conn.removeListener(_onConn);
     _rec.dispose();
     super.dispose();
+  }
+
+  // ── 浮层小窗(WindowListener) ──────────────────────────────────────────
+
+  @override
+  void onWindowBlur() {
+    if (!_rec.finished && mounted) _enterOverlay();
+  }
+
+  @override
+  void onWindowFocus() {
+    if (mounted) _exitOverlay();
+  }
+
+  Future<void> _enterOverlay() async {
+    if (_overlayMode || _rec.finished || !mounted) return;
+    _normalSize = await windowManager.getSize();
+    await windowManager.setAlwaysOnTop(true);
+    await windowManager.setSize(const Size(260, 110));
+    if (mounted) setState(() => _overlayMode = true);
+  }
+
+  Future<void> _exitOverlay() async {
+    if (!_overlayMode || !mounted) return;
+    setState(() => _overlayMode = false);
+    await windowManager.setAlwaysOnTop(false);
+    await windowManager.setSize(_normalSize);
   }
 
   void _onConn() {
@@ -80,6 +129,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _complete() async {
     if (_completing) return;
     _completing = true;
+    if (_isDesktop) await _exitOverlay(); // 训练结束,先还原窗口再导航
     final Workout? w = _rec.result;
     await _conn.disconnectDevice();
     if (!mounted) return;
@@ -104,6 +154,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_overlayMode && _isDesktop) return _buildOverlay();
     final m = _rec.metrics;
     final moving = _conn.lastSample?.moving ?? false;
     return PopScope(
@@ -544,4 +595,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
             style: TextStyle(
                 fontSize: 12.5, fontWeight: FontWeight.w700, color: c)),
       );
+
+  // ── 浮层小窗内容(Windows 失焦时替换整个 build) ─────────────────────────
+  Widget _buildOverlay() {
+    final m = _rec.metrics;
+    final spm = m.spm == 0 ? '—' : m.spm.round().toString();
+    final bpmStr = (_conn.hrConnected && !_conn.hrSignalWeak)
+        ? (_conn.hrBpm?.toString() ?? '—')
+        : '—';
+    final el = _rec.elapsed;
+    final timeStr =
+        '${el.inMinutes}:${(el.inSeconds % 60).toString().padLeft(2, '0')}';
+
+    return GestureDetector(
+      onTap: _exitOverlay,
+      child: Container(
+        color: const Color(0xFF101828),
+        child: Row(
+          children: [
+            _overlayMetric('⚡', spm, 'spm'),
+            _overlayDivider(),
+            _overlayMetric('♥', bpmStr, 'bpm'),
+            _overlayDivider(),
+            _overlayMetric('⏱', timeStr, '时间'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _overlayMetric(String icon, String value, String unit) {
+    return Expanded(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text('$icon $value',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text(unit,
+              style:
+                  const TextStyle(color: Colors.white54, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  Widget _overlayDivider() =>
+      Container(width: 1, height: 38, color: Colors.white24);
 }
