@@ -1,13 +1,20 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'app_state.dart';
 import 'screens/app_shell.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (!kIsWeb &&
+      (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
+    await windowManager.ensureInitialized();
+  }
   // design-spec §1:App 全屏铺满,边到边。
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   runApp(const RowerApp());
@@ -73,6 +80,16 @@ class _IssueTagBadgeState extends State<_IssueTagBadge> {
 
   // 各 issue 的测试步骤;新增 issue 时在这里加一条即可,跟着 dart-define 走。
   static const Map<String, String> _steps = {
+    '#8': '''浮层小窗(训练中切出)
+
+1. 连接划船机,进入仪表盘(开始训练)
+2. 拉几下手柄确认训练已启动(状态栏显示已连接)
+3. 点击其他窗口(如记事本/浏览器),切离仪表盘
+4. 划船 App 应自动收缩成小悬浮窗,显示桨频/心率/时间
+5. 浮窗应置顶,叠在其他窗口之上
+6. 点击浮窗 → 恢复完整仪表盘
+7. 恢复后正常结束训练
+8. 没在训练时切出(ConnectScreen 切出)→ 不出浮窗''',
     '#4': '''记录详情页配速/心率曲线
 
 1. 连接划船机,做一次训练(轻划/短划均可,≥30s/≥3 桨/≥20m 才存)
