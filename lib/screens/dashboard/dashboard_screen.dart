@@ -42,7 +42,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _overlayMode = false;
   Size _normalSize = const Size(1280, 720); // main.cpp 初始尺寸
   bool? _desiredOverlay; // 最新意图;null = 无待处理
-  bool _syncing = false; // _syncWindow 是否在跑(串行闸)
+  Future<void>? _syncFuture; // 收敛中的 in-flight future,兼作串行闸
 
   @override
   void initState() {
@@ -104,19 +104,18 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   /// 记下最新意图并驱动收敛。blur/focus 快速来回时,中间态被折叠,
-  /// 最终只落到与焦点一致的状态。
+  /// 最终只落到与焦点一致的状态。`??=` 保证同一时刻只有一条收敛在跑,
+  /// 已在跑时仅更新 _desiredOverlay,由那条的 while 循环捡起。
   void _requestOverlay(bool want) {
     _desiredOverlay = want;
-    _syncWindow();
+    _syncFuture ??= _syncWindow();
   }
 
-  /// 串行收敛窗口状态到 [_desiredOverlay]。`_syncing` 闸保证同一时刻只有
-  /// 一条 setSize/alwaysOnTop 序列在跑 —— 这是竞态/污染的根因:
+  /// 串行收敛窗口状态到 [_desiredOverlay]。同一时刻只有一条在跑
+  /// (由 [_requestOverlay] 的 `??=` 保证)—— 这是竞态/污染的根因:
   /// 因为只有在 `_overlayMode == false`(窗口确在常规尺寸)时才会读
   /// getSize() 存入 _normalSize,小窗尺寸绝不会污染 _normalSize。
   Future<void> _syncWindow() async {
-    if (_syncing) return;
-    _syncing = true;
     try {
       while (mounted &&
           _desiredOverlay != null &&
@@ -135,17 +134,14 @@ class _DashboardScreenState extends State<DashboardScreen>
         if (mounted) setState(() => _overlayMode = want);
       }
     } finally {
-      _syncing = false;
+      _syncFuture = null;
     }
   }
 
-  /// 训练收尾前同步还原窗口(等收敛跑完),保证导航离开时窗口干净。
+  /// 训练收尾前同步还原窗口(直接 await 在跑的收敛),保证导航离开时窗口干净。
   Future<void> _restoreWindow() async {
     _requestOverlay(false);
-    // 等串行收敛结束(_syncWindow 自带闸,这里轮询其完成)。
-    while (_syncing) {
-      await Future<void>.delayed(const Duration(milliseconds: 16));
-    }
+    await _syncFuture;
   }
 
   void _onConn() {
